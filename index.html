@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nose Knows: Beer Sensory Challenge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1a0f06; --bg2:#2a1708; --amber:#f2a516; --amber2:#ffcb4d; --foam:#fff6e3;
+    --ink:#fff6e3; --muted:#d9c4a0; --good:#5fd38a; --bad:#ff6b5a; --card:rgba(255,246,227,.06);
+    --line:rgba(255,246,227,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:Inter,system-ui,sans-serif;color:var(--ink);
+    background:radial-gradient(120% 80% at 50% 110%,#7a3f0c 0%,var(--bg2) 45%,var(--bg) 100%);
+    min-height:100vh;overflow-x:hidden;
+  }
+  #bubbles{position:fixed;inset:0;pointer-events:none;z-index:0}
+  .bubble{position:absolute;bottom:-20px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.7),rgba(255,220,140,.15));
+    animation:rise linear infinite}
+  @keyframes rise{to{transform:translateY(-110vh) translateX(var(--drift))}}
+  .wrap{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:20px 18px 40px}
+  h1,h2,.display{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;letter-spacing:-.02em}
+  .screen{display:none;animation:fadeUp .4s ease}
+  .screen.active{display:block}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+  /* top bar */
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .brand{font-family:"Bricolage Grotesque";font-weight:800;font-size:15px;color:var(--amber2);letter-spacing:.04em;text-transform:uppercase}
+  .iconbtn{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:999px;
+    padding:8px 14px;font:600 13px Inter;cursor:pointer}
+  .iconbtn:hover{background:rgba(255,246,227,.12)}
+
+  /* start */
+  .hero{text-align:center;padding:24px 0 10px}
+  .hero h1{font-size:clamp(40px,9vw,72px);line-height:.95;margin:14px 0 12px}
+  .hero h1 span{color:var(--amber)}
+  .hero p{color:var(--muted);max-width:520px;margin:0 auto;font-size:16px;line-height:1.5}
+  .pint{width:110px;height:150px;margin:0 auto;position:relative}
+  .label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:26px 0 10px;text-align:center}
+  .choices{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .chip{background:var(--card);border:1.5px solid var(--line);color:var(--ink);border-radius:14px;padding:14px 10px;
+    cursor:pointer;text-align:center;font:600 15px Inter;transition:.15s}
+  .chip small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:4px}
+  .chip:hover{border-color:var(--amber)}
+  .chip.sel{border-color:var(--amber);background:rgba(242,165,22,.16)}
+  .big{display:block;width:100%;margin-top:26px;padding:18px;border:none;border-radius:16px;cursor:pointer;
+    background:linear-gradient(180deg,var(--amber2),var(--amber));color:#2a1708;
+    font:800 20px "Bricolage Grotesque";letter-spacing:.01em;box-shadow:0 8px 0 #9a5a06,0 14px 30px rgba(0,0,0,.4);transition:.1s}
+  .big:active{transform:translateY(5px);box-shadow:0 3px 0 #9a5a06}
+  .best{text-align:center;color:var(--muted);font-size:13px;margin-top:16px}
+
+  /* game */
+  .hud{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .stat b{display:block;font:800 24px "Bricolage Grotesque"}
+  .stat span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .streak b{color:var(--amber2)}
+  .timerwrap{position:relative;height:16px;border-radius:999px;background:rgba(255,246,227,.08);overflow:hidden;border:1px solid var(--line)}
+  .timerbar{position:absolute;inset:0;transform-origin:left;background:linear-gradient(90deg,var(--amber),var(--amber2));
+    box-shadow:inset 0 3px 0 rgba(255,255,255,.35)}
+  .timerbar.low{background:linear-gradient(90deg,#ff4d3d,#ff8a5a);animation:pulse .5s infinite alternate}
+  @keyframes pulse{to{opacity:.6}}
+  .timerrow{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:8px 2px 18px}
+  .timerrow .secs{font-weight:600;color:var(--ink)}
+  .qcard{background:linear-gradient(180deg,rgba(255,246,227,.09),rgba(255,246,227,.04));border:1px solid var(--line);
+    border-radius:22px;padding:22px 20px;box-shadow:0 20px 40px rgba(0,0,0,.25)}
+  .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    background:rgba(242,165,22,.18);color:var(--amber2);padding:5px 10px;border-radius:999px;margin-bottom:12px}
+  .qtext{font:800 clamp(21px,4.6vw,27px)/1.2 "Bricolage Grotesque";margin-bottom:18px}
+  .answers{display:grid;gap:10px}
+  .ans{display:flex;gap:12px;align-items:center;text-align:left;width:100%;background:rgba(0,0,0,.18);
+    border:1.5px solid var(--line);color:var(--ink);border-radius:14px;padding:14px;cursor:pointer;font:500 15px/1.35 Inter;transition:.12s}
+  .ans:hover:not(:disabled){border-color:var(--amber);transform:translateX(3px)}
+  .ans .k{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:rgba(255,246,227,.1);font:800 14px "Bricolage Grotesque"}
+  .ans.right{border-color:var(--good);background:rgba(95,211,138,.16)}
+  .ans.right .k{background:var(--good);color:#0d2a17}
+  .ans.wrong{border-color:var(--bad);background:rgba(255,107,90,.14);animation:shake .35s}
+  .ans.wrong .k{background:var(--bad);color:#2a0b07}
+  .ans.gone{opacity:.25;pointer-events:none}
+  .ans:disabled{cursor:default}
+  @keyframes shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+  .tools{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px}
+  .lifeline{background:transparent;border:1.5px dashed rgba(242,165,22,.6);color:var(--amber2);border-radius:999px;padding:8px 14px;
+    font:600 13px Inter;cursor:pointer}
+  .lifeline:disabled{opacity:.3;cursor:default}
+  .qnum{font-size:13px;color:var(--muted)}
+  .feedback{margin-top:16px;border-radius:16px;padding:16px;display:none;border:1px solid var(--line);background:rgba(0,0,0,.2)}
+  .feedback.show{display:block;animation:fadeUp .3s}
+  .feedback h3{font:800 20px "Bricolage Grotesque";margin-bottom:6px}
+  .feedback.ok h3{color:var(--good)} .feedback.no h3{color:var(--bad)}
+  .feedback p{color:var(--muted);line-height:1.5;font-size:14.5px}
+  .feedback p b{color:var(--ink)}
+  .next{margin-top:14px;width:100%;padding:13px;border-radius:12px;border:none;background:var(--foam);color:#2a1708;
+    font:800 16px "Bricolage Grotesque";cursor:pointer}
+  .pop{position:fixed;font:800 28px "Bricolage Grotesque";color:var(--amber2);pointer-events:none;z-index:5;
+    animation:floatUp 1s ease-out forwards;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+  @keyframes floatUp{to{transform:translateY(-70px);opacity:0}}
+
+  /* end */
+  .result{text-align:center}
+  .result .rank{font-size:clamp(30px,7vw,48px);margin:8px 0;color:var(--amber2)}
+  .result .score{font:800 64px "Bricolage Grotesque"}
+  .result .sub{color:var(--muted)}
+  .breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}
+  .review{text-align:left;margin-top:24px}
+  .review h3{font:800 18px "Bricolage Grotesque";margin-bottom:10px}
+  .ritem{display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:var(--card);margin-bottom:8px;font-size:14px;line-height:1.4}
+  .ritem .dot{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800}
+  .ritem .dot.y{background:var(--good);color:#0d2a17}.ritem .dot.n{background:var(--bad);color:#2a0b07}
+  .ritem small{color:var(--muted);display:block}
+  .topics{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .tchip{background:var(--card);border:1.5px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 14px;
+    font:600 13px Inter;cursor:pointer}
+  .tchip small{color:var(--muted);font-weight:400;margin-left:4px}
+  .tchip.sel{border-color:var(--amber);background:rgba(242,165,22,.18);color:var(--amber2)}
+  .cover{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px}
+  .coverhead{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:8px}
+  .coverhead b{color:var(--amber2);font:800 16px "Bricolage Grotesque"}
+  .coverbar{height:10px;border-radius:999px;background:rgba(255,246,227,.08);overflow:hidden}
+  .coverbar div{height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--amber2));transition:width .6s}
+  .coverbtns{display:flex;gap:8px;margin-top:12px;justify-content:center;flex-wrap:wrap}
+  .libhead{display:flex;align-items:center;gap:12px;margin:6px 0 6px}
+  .libhead h2{font-size:28px}
+  .libsub{color:var(--muted);font-size:14px;margin-bottom:12px}
+  .search{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--line);background:rgba(0,0,0,.25);
+    color:var(--ink);font:500 15px Inter;margin-bottom:12px;outline:none}
+  .search:focus{border-color:var(--amber)}
+  #libList{margin-top:14px;display:grid;gap:10px}
+  .lcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .lcard .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+  .lcard h4{font:800 17px "Bricolage Grotesque"}
+  .lcard .d{font-size:12px;color:var(--amber2);font-weight:600;white-space:nowrap}
+  .lcard p{font-size:13.5px;color:var(--muted);line-height:1.45;margin-top:5px}
+  .lcard p b{color:var(--ink);font-weight:600}
+  .lcard .met{color:var(--good)}
+  .empty{color:var(--muted);text-align:center;padding:20px}
+
+  /* ---------- live ---------- */
+  .big.alt{background:transparent;color:var(--amber2);border:2px solid var(--amber);box-shadow:none;margin-top:12px;font-size:17px;padding:14px}
+  .big.alt:active{transform:translateY(2px)}
+  .big:disabled{opacity:.45;cursor:default}
+  .sync{font-size:12px;color:var(--good);text-align:center;margin-top:8px;min-height:0}
+  .note{background:rgba(242,165,22,.12);border:1px solid rgba(242,165,22,.4);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px;color:var(--foam)}
+  .note.bad{background:rgba(255,107,90,.12);border-color:rgba(255,107,90,.5)}
+  .note:empty{display:none}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+  .panel h3{font:800 20px "Bricolage Grotesque";margin-bottom:10px}
+  .panel .label{text-align:left;margin:14px 0 8px}
+  .panel .topics{justify-content:flex-start}
+  .search.code{font:800 24px "Bricolage Grotesque";letter-spacing:.3em;text-align:center;text-transform:uppercase}
+  body.hosting .wrap{max-width:1180px}
+  .hhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .hbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .hcode{font-size:14px;color:var(--muted)} .hcode b{color:var(--amber2);letter-spacing:.1em}
+  .net{font-size:12px;font-weight:600;margin-left:6px} .net.ok{color:var(--good)} .net.bad{color:var(--bad)}
+  .auto{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+  .lobby{display:grid;grid-template-columns:minmax(260px,1fr) 1.4fr;gap:22px}
+  .joinbox{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;text-align:center}
+  .bigcode{font:800 clamp(44px,6.5vw,92px)/1 "Bricolage Grotesque";letter-spacing:.08em;white-space:nowrap;color:var(--amber2);margin:6px 0 12px}
+  .qr{display:flex;justify-content:center;margin:6px auto 12px}
+  .qr img,.qr canvas{border:8px solid var(--foam);border-radius:10px}
+  .jl{font-size:13px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+  .mono{font-family:ui-monospace,monospace;font-size:11px;word-break:break-all}
+  .lobbyside h3{font:800 22px "Bricolage Grotesque";margin-bottom:6px}
+  .pchips{display:flex;flex-wrap:wrap;gap:8px;min-height:80px;align-content:flex-start}
+  .pchip{background:rgba(242,165,22,.16);border:1px solid rgba(242,165,22,.5);border-radius:999px;padding:8px 14px;font-weight:600;animation:fadeUp .3s}
+  .pchip.off{opacity:.45}
+  .hqtop{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+  .qn{color:var(--muted);font-size:14px}
+  .timerwrap.big{height:22px;margin-top:10px}
+  .hqrow{display:flex;justify-content:space-between;margin:8px 2px 14px;font-weight:600}
+  .answered{color:var(--amber2)}
+  .hqtext{font:800 clamp(24px,3.6vw,40px)/1.2 "Bricolage Grotesque";margin-bottom:18px}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .tile{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;border-radius:16px;padding:18px 16px;font:600 clamp(15px,1.7vw,20px)/1.3 Inter;color:#fff;min-height:74px;transition:.3s}
+  .tile .shape{font-size:22px;flex:none;width:30px;text-align:center}
+  .tile .otext{position:relative;z-index:1;flex:1}
+  .tile .cnt{position:relative;z-index:1;font:800 22px "Bricolage Grotesque"}
+  .tile .bar{position:absolute;left:0;bottom:0;height:6px;background:rgba(255,255,255,.7)}
+  .t0{background:#c2402c} .t1{background:#2a6fbe} .t2{background:#a87a0c} .t3{background:#2f8a4d}
+  .tile.dim{opacity:.35;filter:saturate(.4)}
+  .tile.right{outline:4px solid var(--foam);transform:scale(1.02)}
+  .hctl{display:flex;justify-content:flex-end;margin-top:12px}
+  .revgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:16px}
+  .fact{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--muted);line-height:1.5;font-size:15px}
+  .fact b{color:var(--ink)}
+  .minib{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .minib .label{margin:0 0 8px}
+  .brow{display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--line);font-size:15px}
+  .brow:last-child{border-bottom:none}
+  .brow .rk{width:24px;font:800 16px "Bricolage Grotesque";color:var(--amber2)}
+  .brow .bn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .brow .gain{color:var(--good);font-size:12px;font-weight:600}
+  .brow .bs{font:800 16px "Bricolage Grotesque"}
+  .tboard{margin-top:10px;border-top:2px solid var(--line);padding-top:8px}
+  .trow{display:flex;justify-content:space-between;padding:4px;font-size:15px} .trow small{color:var(--muted)}
+  .tnote{font-size:11px;color:var(--muted);margin-top:4px}
+  .endh h2{font-size:clamp(30px,5vw,48px);text-align:center;margin-bottom:10px}
+  .podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:end;max-width:640px;margin:10px auto 20px}
+  .pod{border-radius:16px 16px 6px 6px;text-align:center;padding:14px 8px;background:linear-gradient(180deg,var(--amber2),var(--amber));color:#2a1708;opacity:0;animation:podUp .7s ease forwards}
+  .pod.p1{min-height:220px} .pod.p2{min-height:170px;background:linear-gradient(180deg,#e9e3d6,#bdb3a1)} .pod.p3{min-height:130px;background:linear-gradient(180deg,#e0a46a,#b36d33)}
+  .pod .pn{font:800 18px "Bricolage Grotesque";word-break:break-word} .pod .ps{font-weight:600} .pod .pb{font-size:40px;margin-top:6px}
+  @keyframes podUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+  .hrow{display:flex;justify-content:space-between;gap:10px;padding:6px 4px;border-bottom:1px solid var(--line);font-size:13.5px}
+  .hrow b{color:var(--good)} .hrow b.lo{color:var(--bad)}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px 18px}
+  .pcard.center{text-align:center} .pcard h2{font-size:28px;margin-bottom:6px}
+  .pcard.ok h2{color:var(--good)} .pcard.no h2{color:var(--bad)}
+  .pcard .sub{color:var(--muted);line-height:1.5;margin:8px 0 14px}
+  .bigemoji{font-size:64px}
+  .gainbig{font:800 46px "Bricolage Grotesque";color:var(--amber2)}
+  .pstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+  .pstats div{background:rgba(0,0,0,.2);border-radius:12px;padding:10px}
+  .pstats b{display:block;font:800 22px "Bricolage Grotesque"} .pstats small{font-size:13px;color:var(--muted)}
+  .pstats span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .teams{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .team{background:var(--card);border:2px solid var(--line);color:var(--ink);border-radius:14px;padding:12px 4px;font:600 14px Inter;cursor:pointer;line-height:1.6}
+  .team.sel{border-color:var(--amber);background:rgba(242,165,22,.2)}
+  .popt{color:#fff;border:none;min-height:64px}
+  .popt .k{background:rgba(0,0,0,.25);color:#fff}
+  .popt.picked{outline:4px solid var(--foam)}
+  .popt.gone{opacity:.3}
+  .lock{text-align:center;font-weight:600;margin-top:14px;color:var(--amber2);min-height:20px}
+  .warn{color:var(--bad);font-size:13px;text-align:center;margin-top:6px}
+  @media (max-width:760px){ .lobby,.revgrid{grid-template-columns:1fr} .tiles{grid-template-columns:1fr} }
+  @media (prefers-reduced-motion:reduce){ *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition:none!important} #bubbles{display:none} }
+  canvas#confetti{position:fixed;inset:0;pointer-events:none;z-index:4}
+  @media (max-width:600px){.choices{grid-template-columns:1fr 1fr}}
+  @media (max-width:480px){.stat b{font-size:20px}}
+</style>
+</head>
+<body>
+<div id="bubbles"></div>
+<canvas id="confetti"></canvas>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">🍺 Sensory Lab</div>
+    <button class="iconbtn" id="muteBtn" aria-label="Toggle sound">🔊 Sound on</button>
+  </div>
+
+  <!-- START -->
+  <section class="screen active" id="start">
+    <div class="hero">
+      <svg class="pint" viewBox="0 0 110 150" aria-hidden="true">
+        <defs><clipPath id="glass"><path d="M12 10 L98 10 L88 142 Q55 148 22 142 Z"/></clipPath>
+          <linearGradient id="beer" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffcb4d"/><stop offset="1" stop-color="#c9700a"/></linearGradient></defs>
+        <g clip-path="url(#glass)">
+          <rect x="0" y="34" width="110" height="120" fill="url(#beer)"/>
+          <path d="M0 38 Q14 22 28 34 Q42 18 56 32 Q70 18 84 32 Q98 20 110 34 L110 0 L0 0Z" fill="#fff6e3"/>
+          <circle cx="40" cy="110" r="2" fill="#fff8" ><animate attributeName="cy" from="140" to="45" dur="2.2s" repeatCount="indefinite"/></circle>
+          <circle cx="66" cy="120" r="1.6" fill="#fff8"><animate attributeName="cy" from="140" to="45" dur="1.7s" repeatCount="indefinite"/></circle>
+          <circle cx="54" cy="90" r="1.3" fill="#fff8"><animate attributeName="cy" from="140" to="45" dur="2.8s" repeatCount="indefinite"/></circle>
+        </g>
+        <path d="M12 10 L98 10 L88 142 Q55 148 22 142 Z" fill="none" stroke="#fff6e3" stroke-opacity=".5" stroke-width="3"/>
+      </svg>
+      <h1>The Nose <span>Knows</span></h1>
+      <p>Sniff out the truth across all 114 beer flavour standards. Race the clock on aromas, flavours and where they come from, and build a streak to multiply your points.</p>
+    </div>
+
+    <div class="label">Pick your level</div>
+    <div class="choices" id="levels">
+      <button class="chip" data-t="25" data-n="10">Apprentice<small>25s · 10 questions</small></button>
+      <button class="chip sel" data-t="15" data-n="12">Taster<small>15s · 12 questions</small></button>
+      <button class="chip" data-t="9" data-n="15">Brewmaster<small>9s · 15 questions</small></button>
+      <button class="chip" data-t="15" data-n="40">Marathon<small>15s · 40 questions</small></button>
+    </div>
+    <div class="label">Pick a topic</div>
+    <div class="topics" id="topics"></div>
+    <button class="big" id="startBtn">Crack one open 🍻</button>
+    <button class="big alt" id="liveBtn">🎮 Live multiplayer: host or join</button>
+    <div class="best" id="bestLine"></div>
+    <div class="cover">
+      <div class="coverhead"><span>Standards mastered</span><b id="coverNum">0 / 114</b></div>
+      <div class="coverbar"><div id="coverFill"></div></div>
+      <div class="coverhead" style="margin-top:12px"><span>⭐ Core 32 mastered</span><b id="coreNum">0 / 32</b></div>
+      <div class="coverbar"><div id="coreFill"></div></div>
+      <div class="sync" id="syncNote"></div>
+      <div class="coverbtns">
+        <button class="iconbtn" id="libBtn">📚 Flavour library</button>
+        <button class="iconbtn" id="resetBtn">↺ Reset progress</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LIVE MENU -->
+  <section class="screen" id="liveMenu">
+    <div class="libhead"><button class="iconbtn" id="liveBack">← Back</button><h2>Live game</h2></div>
+    <p class="libsub">Run a session for your panel. The trainer hosts on one screen (projector, TV or shared Teams screen) and everyone joins on their own phone or laptop.</p>
+    <div class="note" id="liveStatus"></div>
+    <div class="note bad" id="liveMsg" style="display:none"></div>
+    <div id="resumeBox"></div>
+    <div class="panel">
+      <h3>📱 Join a game</h3>
+      <input id="joinCode" class="search code" maxlength="4" placeholder="ROOM CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code">
+      <input id="joinName" class="search" maxlength="20" placeholder="Your name or nickname" autocomplete="nickname" aria-label="Your name">
+      <button class="big" id="joinBtn">Join 📱</button>
+    </div>
+    <div class="panel">
+      <h3>🖥️ Host a game</h3>
+      <div class="label">Topic</div><div class="topics" id="hostTopics"></div>
+      <div class="label">Questions</div><div class="topics" id="hostCount"></div>
+      <div class="label">Seconds per question</div><div class="topics" id="hostSecs"></div>
+      <div class="label">Mode</div><div class="topics" id="hostTeams"></div>
+      <button class="big" id="hostBtn">Host on this screen 🖥️</button>
+    </div>
+  </section>
+
+  <!-- HOST -->
+  <section class="screen" id="host"><div id="hostView"></div></section>
+  <!-- PLAYER -->
+  <section class="screen" id="player"><div id="playerView"></div></section>
+
+  <!-- LIBRARY -->
+  <section class="screen" id="library">
+    <div class="libhead">
+      <button class="iconbtn" id="libBack">← Back</button>
+      <h2>Flavour library</h2>
+    </div>
+    <p class="libsub">All 114 beer flavour standards. ✓ marks the ones you've answered correctly.</p>
+    <input id="libSearch" class="search" type="search" placeholder="Search: e.g. banana, sulphur, hops…">
+    <div class="topics" id="libCats"></div>
+    <div id="libList"></div>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="game">
+    <div class="hud">
+      <div class="stat"><span>Score</span><b id="score">0</b></div>
+      <div class="stat streak"><span>Streak</span><b id="streak">0 🔥</b></div>
+      <div class="stat"><span>Multiplier</span><b id="mult">×1</b></div>
+    </div>
+    <div class="timerwrap"><div class="timerbar" id="timerbar"></div></div>
+    <div class="timerrow"><span class="qnum" id="qnum">Question 1</span><span class="secs" id="secs">15s</span></div>
+
+    <div class="qcard">
+      <div class="tag" id="qtag">Aroma</div>
+      <div class="qtext" id="qtext"></div>
+      <div class="answers" id="answers"></div>
+      <div class="tools">
+        <button class="lifeline" id="fiftyBtn">🍺 Half-pint (50:50)</button>
+        <button class="lifeline" id="skipBtn">⏭ Skip</button>
+      </div>
+      <div class="feedback" id="feedback">
+        <h3 id="fbTitle"></h3>
+        <p id="fbText"></p>
+        <button class="next" id="nextBtn">Next →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section class="screen" id="end">
+    <div class="result">
+      <div class="label" style="margin-top:10px">Your sensory rank</div>
+      <div class="rank display" id="rank"></div>
+      <div class="score" id="finalScore">0</div>
+      <div class="sub" id="endSub"></div>
+      <div class="breakdown">
+        <div class="stat"><span>Correct</span><b id="eCorrect">0</b></div>
+        <div class="stat"><span>Best streak</span><b id="eStreak">0</b></div>
+        <div class="stat"><span>Avg time</span><b id="eTime">0s</b></div>
+      </div>
+      <button class="big" id="againBtn">Pour another round 🍺</button>
+    </div>
+    <div class="review"><h3>Tasting notes: review</h3><div id="review"></div></div>
+  </section>
+</div>
+
+<script>
+/* ============ SENSORY DATA: all 114 beer flavour standards ============ */
+/* [chemical, descriptor, what it smells/tastes like, typical origin, category, confusion-group, tip] */
+const RAW = [
+["2,3,5-Trimethylpyrazine","Dark chocolate","Dark chocolate, cocoa, roasted nuts","Maillard reactions when malt is roasted at high temperature (dark and chocolate malts)","Malt","roast","Pyrazines are the toasty backbone of porters and stouts."],
+["2,3-Butanedione","Diacetyl","Butter, butterscotch, butter popcorn","Yeast by-product (from alpha-acetolactate) not reabsorbed due to short maturation, or Pediococcus infection","Yeast","butter","Brewers hold a 'diacetyl rest' so yeast can reabsorb it. Some tasters are partly blind to it."],
+["2,4,6-Tribromoanisole","Musty-TBA","Musty, damp cellar, mouldy","Moulds converting bromophenols, often from treated wooden pallets or packaging materials","Taint","musty","Detectable at parts per trillion; it can transfer through the air into packaging."],
+["2,4,6-Trichloroanisole","Musty-TCA","Musty, corked wine, damp cardboard","Moulds converting chlorophenols in wood, cork, cardboard or contaminated materials","Taint","musty","The classic 'corked wine' taint. Keep packaging dry and away from chlorine-treated wood."],
+["2,6-Dichlorophenol","Chlorophenol","Antiseptic, TCP, swimming pool","Chlorine from water or sanitiser reacting with phenols in the beer","Taint","medicinal","Carbon-filter brewing water and rinse chlorine sanitisers thoroughly."],
+["2-Acetyl pyrazine","Basmati rice","Basmati rice, roasted nutty, popcorn-like","Maillard reactions during malt kilning and roasting","Malt","rice","A toasty-cereal note that adds 'warmth' to malt character."],
+["2-Acetyl pyridine","Malty-biscuity","Biscuit, cracker, toasted bread","Maillard reactions in kilned malts such as biscuit and amber malt","Malt","biscuit","Think digestive biscuit: a positive malt character in pale and amber ales."],
+["2-Acetyl thiazole","Popcorn","Popcorn, roasted cereal, nutty","Maillard reactions between sugars and sulphur amino acids during kilning","Malt","rice","Don't confuse with diacetyl's butter popcorn: this is the dry, toasty popcorn, no butter."],
+["2-Aminoacetophenone","Grape-like","Foxy grape, grape juice, tortilla","Breakdown of the amino acid tryptophan, associated with ageing and some microbial activity","Ageing","grape","Gives the 'foxy' smell of Concord grape juice."],
+["2-Bromo-4-methylphenol","Medicinal","Medicinal, iodine, seaweed","Bromine-containing chemicals (e.g. sanitisers or treated materials) reacting with phenols","Taint","medicinal","Halophenols are among the most potent taints in beer."],
+["2-Bromophenol","Bromophenol","Iodine-like, briny, electric-fire / hot dust","Bromine from water treatment or sanitiser reacting with phenol","Taint","medicinal","Like other halophenols, it is detectable at incredibly low levels."],
+["2-Furfuryl ethyl ether","Solvent-like","Solvent, ethereal, stale","Forms during ageing as furfuryl alcohol reacts with ethanol","Ageing","solvent","A marker of beer staling, especially in warm storage."],
+["2-Furfurylthiol","Burnt coffee","Freshly roasted coffee, burnt","Roasted malts: it is the key aroma compound of roasted coffee","Malt","roast","Gives the coffee note in stouts and porters."],
+["2-Iodo-4-methylphenol","Medicinal","Medicinal, antiseptic, iodine","Iodophor sanitiser residues reacting with phenols","Taint","medicinal","Rinse or drain iodophor sanitisers properly to avoid it."],
+["2-Isobutyl-3-methoxypyrazine","Earthy-green pepper","Green bell pepper, earthy, green pea","Raw materials: present in green plants and some hop varieties; also made by some soil microbes","Hops","pepper","The 'green pepper' of Sauvignon Blanc, detectable in parts per trillion."],
+["2-Isopropyl-3-methoxypyrazine","Earthy-potato skins","Raw potato skins, earthy, pea pod","Produced by soil bacteria; enters through contaminated raw materials or water","Taint","earthy","Linked to 'potato taste' defects in coffee and ladybird taint in wine."],
+["2-Methylisoborneol","Earthy-compost","Earthy, musty, compost, muddy","Produced by cyanobacteria and actinomycetes in water supplies","Taint","earthy","A common seasonal water taint after algal blooms."],
+["3-Mercaptohexanol","Grapefruit","Grapefruit, rhubarb, citrus pith","Hop thiol, released by yeast from hop and malt precursors (biotransformation)","Hops","citrus","Big in New World hops. Yeast strain choice changes how much is released."],
+["3-Mercaptohexyl acetate","Passion fruit","Passion fruit, guava, tropical","Yeast converts 3-mercaptohexanol into this acetate ester","Hops","tropical","The juicy tropical punch of hazy IPAs."],
+["3-Methyl-2-butene-1-thiol","Lightstruck","Skunky, fox, burnt rubber","Light (UV and blue) splitting hop iso-alpha-acids, which then react with sulphur","Process","skunk","Clear and green glass offer little protection; brown glass and cans block it."],
+["3-Methylthiohexyl acetate","Lychee","Lychee, tropical, sulphury fruit","Thiol-related ester associated with hops and yeast fermentation","Hops","tropical","Part of the 'tropical thiol' family alongside 3MH and 3MHA."],
+["4-Ethyl guaiacol","Spicy","Smoky, spicy, clove-bacon","Brettanomyces yeast reducing 4-vinyl guaiacol","Infection","smoky","A hallmark of Brett-aged and barrel-aged beers; in a clean lager it's spoilage."],
+["4-Ethyl phenol","Band aid","Sticking plaster, horse, barnyard","Brettanomyces yeast reducing 4-vinyl phenol","Infection","barnyard","The 'horse blanket' note. Wanted in some lambics, a fault elsewhere."],
+["4-Mercapto-4-methylpentan-2-one","Catty","Blackcurrant, box tree, cat pee at high levels","Hop thiol found in varieties such as Simcoe, Citra and Cascade","Hops","catty","Low levels give blackcurrant; high levels turn catty."],
+["4-Methyl phenol","Barnyard","Pigsty, farmyard, manure","Bacterial breakdown of the amino acid tyrosine; points to contamination","Infection","barnyard","Also called p-cresol."],
+["4-Vinyl guaiacol","Phenolic-4-VG","Clove, smoky spice","Phenolic-positive (POF+) yeast decarboxylating ferulic acid from malt, or wild yeast","Yeast","clove","The signature clove of Hefeweizen. In a lager it points to wild yeast."],
+["5-Methyl-2-hepten-4-one","Hazelnut","Roasted hazelnut, nutty","Key aroma compound of hazelnuts; nutty notes come from malt, ageing or adjuncts","Malt","nut","Also known as filbertone."],
+["6-Chloro-o-cresol","Medicinal","TCP, medicinal, antiseptic","Chlorine reacting with cresols in beer, water or packaging","Taint","medicinal","One of the most potent chlorophenols: parts per trillion matter."],
+["6-Isobutylquinoline","Leathery","Leather, saddle, smoky-woody","Represents leathery notes from long ageing, barrels or Brettanomyces","Ageing","leather","A perfumery compound used to teach 'leather'."],
+["Acetaldehyde","Acetaldehyde","Green apple, fresh-cut pumpkin, emulsion paint","Intermediate of yeast fermentation left in 'green' beer that was packaged too young","Yeast","apple","Healthy yeast and enough time normally clear it. Oxidation can also make it later."],
+["Acetic acid","Acetic","Vinegar, sharp sour","Acetobacter bacteria converting ethanol to acetic acid in the presence of oxygen","Infection","sour","A fault in most beers, intentional in Flanders red ales."],
+["Alpha-humulene","Spicy-humulene","Woody, herbal, spicy noble hop","Hop essential oil, abundant in noble varieties","Hops","woody","Oxidised humulene products give 'herbal-spicy' late-hop character."],
+["Alpha-pinene","Woody-pine resin","Pine needles, resin","Hop essential oil (terpene)","Hops","pine","Also the main aroma of pine trees."],
+["Benzaldehyde","Almond","Marzipan, bitter almond, cherry stone","Fruit additions (especially cherry stones) and some oxidation","Adjunct","almond","Gives the marzipan note in cherry beers like kriek."],
+["Benzyl acetate","Cherry","Cherry, jasmine, fruity-floral","Ester found in fruits and flowers; from fruit additions or yeast in traces","Adjunct","cherry","Combines with benzaldehyde to build a convincing cherry."],
+["Beta-caryophyllene","Cedar","Cedarwood, black pepper, woody","Hop essential oil","Hops","woody","Also found in black pepper and cloves."],
+["Beta-citronellol","Floral-citronella","Citronella, lime, rose","Hop oil; yeast also converts geraniol into citronellol","Hops","floral","An example of hop biotransformation."],
+["Beta-damascenone","Damascenone","Cooked apple, stewed fruit, honey, rose","Breakdown of carotenoids from hops and malt; rises during ageing","Ageing","stewed","Extremely potent and a key marker of beer ageing."],
+["Beta-farnesene","Woody-farnesene","Woody, green, mild floral","Hop essential oil, notably high in Saaz-type noble hops","Hops","woody","Used to help identify noble hop varieties."],
+["Beta-ionone","Floral-violet","Violets, raspberry, woody","Breakdown of carotenoids from hops and malt","Hops","floral","Some people can't smell beta-ionone at all: specific anosmia is common."],
+["Beta-myrcene","Myrcene","Resinous, green, fresh hop","The most abundant hop oil, carried into beer mainly by dry hopping","Hops","pine","Very volatile: most of it boils off in the kettle."],
+["Butyric acid","Butyric","Baby sick, vomit, rancid butter, parmesan","Bacterial infection (e.g. Clostridium) in wort, sugar syrups or adjuncts","Infection","rancid","A clear sign of a hygiene problem upstream."],
+["Catty hop","Catty hop","Catty, blackcurrant leaf, tomato leaf","High levels of certain hop thiols, from some hop varieties or heavy dry hopping","Hops","catty","A blended standard representing catty hop character."],
+["cis-3-Hexenol","Freshly cut grass","Freshly cut grass, green leaves","Leaf alcohol from green plant material, e.g. heavy dry hopping or fresh/wet hops","Hops","grass","The classic smell of a mown lawn."],
+["cis-3-Hexenyl acetate","Green banana","Unripe banana, green apple skin, green","Ester of leaf alcohol; from hops and yeast","Hops","greenfruit","Less sweet than isoamyl acetate: think unripe banana."],
+["cis-6-Nonenal","Melon","Melon, cucumber, green","Lipid-derived aldehyde from the breakdown of fatty acids","Ageing","melon","Characteristic aroma of honeydew melon."],
+["Citric acid","Sour","Clean citrus sourness, lemony acidity","Fruit additions or added acidulant","Taste","sour","A taste standard for sourness."],
+["Citrus hop","Citrus hop","Lemon, orange, citrus hop","Late or dry hopping with citrus-type hop varieties","Hops","hopblend","A blended hop-aroma standard."],
+["D-Carvone","Caraway seed","Caraway, dill, rye bread","Spice additions such as caraway or dill seed","Adjunct","herb","The mirror-image molecule (L-carvone) smells of spearmint."],
+["D-Limonene","Orange-limonene","Orange peel, citrus zest","Citrus peel additions (e.g. witbier); also a minor hop oil","Adjunct","citrus","The main oil in orange peel."],
+["Decanal","Citrus-waxy","Waxy orange peel, citrus rind","Citrus peel, hop oil and lipid oxidation","Adjunct","citrus","A fatty aldehyde: think the white pith of orange peel."],
+["Denatonium benzoate","Bitter","Intensely bitter, non-hop bitterness","Not found in beer: used as a pure bitterness taste reference","Taste","bitter","The most bitter compound known, used in nail-biting deterrents."],
+["Dimethyl disulphide","Rotten vegetable","Rotting vegetables, cooked cabbage, drains","Yeast or bacterial sulphur metabolism","Infection","cabbage","Often appears with other sulphur volatiles in contaminated or stressed ferments."],
+["Dimethyl sulphide","DMS","Cooked sweetcorn, tomato sauce, cooked cabbage","S-methylmethionine in pale malt converting to DMS when the boil is weak or wort cools slowly","Process","corn","A vigorous open boil drives DMS off; also produced by wort bacteria."],
+["Dimethyl trisulphide","Onion","Cooked onion, garlic, sulphury","Forms from hop sulphur compounds and during beer ageing","Ageing","onion","Old, poorly stored hops are a common source."],
+["Ethyl acetate","Ethyl acetate","Nail-varnish remover, solvent, pear drops","The most abundant yeast ester, too high from stressed fermentation or wild yeast","Yeast","solvent","Fruity lift at low levels, harsh solvent at high levels."],
+["Ethyl butyrate","Ethyl butyrate","Pineapple, tutti-frutti, tropical sweets","Ester produced by yeast during fermentation","Yeast","pineapple","Also the main note in pineapple chewing sweets."],
+["Ethyl fenchol","Earthy-damp soil","Damp soil, earthy, camphor","Produced by actinomycete bacteria; enters via water or raw materials","Taint","earthy","Often linked with musty-earthy water taints."],
+["Ethyl hexanoate","Ethyl hexanoate","Red apple, aniseed","Ester formed by yeast from medium-chain fatty acids","Yeast","apple","Ripe sweet red apple, vs acetaldehyde's sharp green apple."],
+["Ethyl phenylacetate","Honey","Honey, sweet floral","Yeast ester; also increases during ageing","Yeast","honey","One of several 'honey' compounds that develop as beer ages."],
+["Ethyl-2-methylbutyrate","Strawberry","Strawberry, sweet fruity, apple","Yeast ester; levels rise with dry hopping and ageing","Yeast","berry","Gives fruity-berry notes in dry-hopped beers."],
+["Eugenol","Spicy","Clove, spicy, smoky","Spice additions (cloves) and oak barrel ageing","Adjunct","clove","Spice cupboard clove. Compare with yeast-derived 4-vinyl guaiacol."],
+["Ferrous sulphate","Metallic","Metallic, ink, blood, tinny","Iron or other metals from water, filter aids or unpassivated equipment","Process","metal","Rub a sample on your hand and sniff: metallic notes are easier to detect this way."],
+["Furaneol","Burnt sugar","Caramel, burnt sugar, strawberry jam","Caramelisation and Maillard reactions in crystal malts and wort boiling","Malt","caramel","Also called strawberry furanone."],
+["Furfuryl octanoate","Sherry","Sherry, nutty, aged","Represents sherry-like notes of aged and oxidised beers","Ageing","sherry","A positive note in barley wines; a fault in fresh pale beers."],
+["gamma-Nonalactone","Coconut","Coconut, creamy, suntan lotion","Forms during ageing and oxidation; also from oak","Ageing","coconut","Rises in stale beers. Compare with oak-derived whisky lactone."],
+["gamma-Undecalactone","Peach","Peach, apricot, creamy fruit","Fruit additions; also traces from yeast and hops","Adjunct","peach","Known as 'peach lactone'."],
+["Geosmin","Geosmin","Freshly dug earth, beetroot, rain on soil","Actinomycetes and cyanobacteria in water; moulds on grain","Taint","earthy","The smell of rain on dry soil. Humans detect it at parts per trillion."],
+["Geraniol","Floral-rose","Rose, geranium, floral","Hop essential oil, from late and dry hopping","Hops","floral","Yeast can convert it into citronellol (biotransformation)."],
+["Guaiacol","Smoky","Smoky, bonfire, smoked meat","Smoked malt (malt dried over wood smoke)","Malt","smoky","The backbone of Rauchbier."],
+["Hop oil extract","Hop oil","Hoppy ale, fresh late-hop aroma","Hop essential oils from late, whirlpool or dry hopping","Hops","hopblend","A blended standard to train general 'hoppy aroma'."],
+["Hydrogen sulphide","H2S","Rotten eggs, struck match","Yeast metabolism of sulphur, especially lager yeast or stressed ferments","Yeast","egg","Most is scrubbed out by CO₂ during fermentation and maturation."],
+["Indole","Indole","Mothballs, faecal, jasmine at low levels","Bacterial (e.g. enteric bacteria) breakdown of tryptophan","Infection","faecal","Paradoxically floral at very low levels and faecal at higher ones."],
+["Infection","Infection","Cooked vegetable, sour, sulphury: typical spoiled beer","Represents contamination by beer-spoilage bacteria","Infection","infect","A blended standard showing what a contaminated beer can smell like."],
+["Iso-alpha-acids","Bitter","Hop bitterness, clean lingering bitter","Hop alpha acids isomerised during the boil","Taste","bitter","Isomerisation makes alpha acids soluble and bitter."],
+["Isoamyl acetate","Isoamyl acetate","Banana, pear drops","Yeast ester, boosted by warm fermentation and wheat beer yeast","Yeast","banana","Wanted in Hefeweizen, a fault in crisp lager."],
+["Isoamyl alcohol","Isoamyl alcohol","Fusel, alcoholic, solventy, warming","Higher (fusel) alcohol from yeast metabolism of leucine; more at warm fermentation","Yeast","fusel","Fusel alcohols also give a warming 'hot' mouthfeel."],
+["Isobutyraldehyde","Grainy","Grainy, husky, green malt","Strecker degradation of valine; from malt and during staling","Malt","grain","Raw-grain, husky character, a bit like muesli."],
+["Isovaleraldehyde","Grainy","Malty, cocoa, raw grain","Strecker degradation of leucine; from malt and during staling","Malt","grain","Also called 3-methylbutanal; adds malty-chocolate notes."],
+["Isovaleric acid","Isovaleric","Cheesy, sweaty socks","Oxidised or badly stored hops (degraded hop acids)","Hops","rancid","Keep hops cold, dark and vacuum-packed."],
+["Kettle hop extract","Kettle hop","Herbal, spicy, boiled-hop character","Hops added early in the boil, surviving as oxidised hop compounds","Hops","hopblend","Different from dry-hop aroma: more herbal-spicy, less fruity."],
+["L-Carvone","Spearmint","Spearmint, chewing gum","Herb additions such as mint; a taint if unintended","Adjunct","herb","Its mirror image (D-carvone) smells of caraway."],
+["Lactic acid","Lactic","Clean sour, yoghurt","Lactobacillus or Pediococcus bacteria fermenting sugars","Infection","sour","Deliberate in Berliner Weisse and Gose; elsewhere a sign of infection."],
+["Limonene oxide","Stale fruit","Stale citrus, old fruit, musty orange","Oxidation of limonene (citrus and hop terpene) during ageing","Ageing","stalefruit","How fresh citrus hop aroma fades as beer ages."],
+["Linalool","Linalool","Floral, lavender, bergamot","Hop essential oil, especially in late and dry-hopped beers","Hops","floral","Often used as a marker of hop aroma intensity."],
+["Linalyl acetate","Floral-lavender","Lavender, bergamot, Earl Grey","Hop oil and botanical additions (lavender, bergamot)","Hops","floral","The fragrance of Earl Grey tea."],
+["Menthol","Menthol","Minty, cooling, peppermint","Mint or botanical additions; a taint if picked up from other products","Adjunct","herb","Also a trigeminal (cooling) sensation, not just an aroma."],
+["Methanethiol","Mercaptan","Drains, rotten cabbage, sewage","Yeast autolysis or sulphur metabolism, often from beer left too long on yeast","Yeast","cabbage","Prompt removal from spent yeast keeps it down."],
+["Methional","Methional","Cooked potato, worty, soupy","Strecker degradation of methionine during wort boiling and staling","Ageing","potato","A key 'worty' off-note, especially in alcohol-free beers."],
+["Methyl thioacetate","Boiled cabbage","Boiled cabbage, cooked vegetables","Yeast sulphur metabolism and some bacteria","Yeast","cabbage","Can break down further into methanethiol."],
+["Natural polyphenol extract","Astringent","Drying, puckering, mouth-coating","Tannins (polyphenols) from grain husks and hops, e.g. over-sparging","Taste","astringent","Astringency is a feel, not a taste or aroma."],
+["Octanoic acid","Caprylic","Goaty, waxy, soapy, tallow","Medium-chain fatty acid released by yeast, more with stress or autolysis","Yeast","goat","Its name comes from the Latin 'caper', meaning goat."],
+["Oxidized","Oxidized","Stale, papery, sherry-like, honey","A blend representing oxidised and aged beer","Ageing","stale","Low oxygen at packaging and cold storage slow staling."],
+["p-Menthane-8-thiol-3-one","Catty","Blackcurrant, catty, sulphury","Sulphur compound found in blackcurrant buds and buchu leaf","Hops","catty","A pure-compound reference for catty aroma."],
+["Phenylacetaldehyde","Aged honey","Aged honey, floral, hyacinth","Strecker degradation of phenylalanine; rises during ageing","Ageing","honey","A staling marker that gives old beer a honeyed edge."],
+["Phenylethyl acetate","Honey","Honey, rose, sweet floral","Ester produced by yeast","Yeast","honey","Fresh rose-honey, unlike the stale honey of aged beer."],
+["Raspberry ketone","Raspberry","Raspberry, jammy berry","Fruit additions (raspberries)","Adjunct","berry","The key aroma compound of raspberries."],
+["Rutin hydrate","Astringent","Drying, mouth-puckering","Flavonoid polyphenol, as found in hops and grain","Taste","astringent","A pure polyphenol reference for astringency."],
+["Skatole","Skatole","Faecal, manure, farmyard","Bacterial breakdown of tryptophan; points to serious contamination","Infection","faecal","Close cousin of indole, and even more faecal."],
+["Sodium bicarbonate","Alkaline","Soapy, chalky, flat","High-alkalinity water or traces of alkaline cleaning detergent","Process","alkaline","Check rinsing after alkaline cleaning cycles."],
+["Sodium chloride","Salty","Salty","Water salts or salt additions (e.g. Gose)","Taste","salt","A basic taste reference."],
+["Sotolon","Brown sugar","Brown sugar, maple syrup, fenugreek/curry","Oxidative ageing; also some caramel malts","Ageing","caramel","Gives the maple-curry note in aged barley wines."],
+["Styrene","Plastics","Plastic, polystyrene, solvent","POF+ yeast decarboxylating cinnamic acid (e.g. wheat beers), or plastic packaging","Yeast","plastic","Shows up alongside clove in some Hefeweizens."],
+["Sucralose","Sweet","Sweet","Sweetener, used as a sweet taste reference","Taste","sweet","A basic taste reference."],
+["Sucrose octaacetate","Bitter","Bitter, non-hop bitterness","Bitter compound used as a taste reference","Taste","bitter","Helps tasters separate bitterness from hop flavour."],
+["Sulphur dioxide","Sulphitic","Struck match, burnt matches, sharp","Produced by yeast during fermentation; also added as an antioxidant (metabisulphite)","Yeast","match","Lager yeasts often produce more SO₂ than ale yeasts."],
+["Terpinyl acetate","Cardamom","Cardamom, herbal, citrus-spice","Spice or botanical additions","Adjunct","herb","The signature aroma of cardamom."],
+["trans,cis-2,6-Nonadienal","Cucumber","Cucumber, green, melon rind","Lipid oxidation during staling","Ageing","melon","Fresh cucumber smell, but a staling sign in beer."],
+["trans,trans-2,4-Heptadienal","Rancid oil","Rancid oil, fatty, fried","Oxidation of fatty acids (lipids)","Ageing","fat","Linked to old malt or poor storage."],
+["trans-2-Nonenal","Papery","Wet cardboard, papery","Oxidation of malt lipids: a classic marker of stale beer","Ageing","stale","Threshold below one part per billion."],
+["trans-Anethole","Aniseed","Aniseed, liquorice, fennel","Spice additions such as star anise or fennel","Adjunct","anise","The flavour of ouzo and pastis."],
+["trans-Cinnamaldehyde","Cinnamon","Cinnamon, warm spice","Spice additions (cinnamon)","Adjunct","cinnamon","Common in winter and Christmas beers."],
+["Vanillin","Vanilla","Vanilla, custard, sweet","Vanilla pod additions or oak barrel ageing","Adjunct","vanilla","Oak releases vanillin as its lignin breaks down."],
+["Whisky lactone","Coconut","Coconut, woody, toasted oak","Oak barrels, especially American oak","Adjunct","coconut","Barrel-aged stouts get much of their coconut-oak from it."],
+];
+const CAT_INFO = {
+  Yeast:"Yeast-derived", Hops:"Hop-derived", Malt:"Malt-derived", Ageing:"Oxidation & ageing",
+  Infection:"Microbial spoilage", Taint:"Taints", Process:"Process & packaging", Adjunct:"Spices, fruit & oak", Taste:"Taste & mouthfeel"
+};
+const COMPOUNDS = RAW.map((r,i)=>({id:i,name:r[0],desc:r[1],aroma:r[2],origin:r[3],cat:r[4],g:r[5],fact:r[6]}));
+
+const EXTRA = [
+  {cat:"Process", q:"Why does beer in clear glass go 'skunky' so quickly?",
+   a:"Light breaks down hop bitter compounds into a thiol", w:["Heat oxidises the malt","CO₂ escapes through the glass","Yeast restarts fermentation"],
+   fact:"Light energy splits iso-alpha-acids; the fragment bonds with sulphur to form MBT, one of the most potent aromas known."},
+  {cat:"Process", q:"What's the purpose of a 'diacetyl rest'?",
+   a:"Let yeast reabsorb buttery diacetyl before cooling", w:["Remove DMS from the wort","Boost hop aroma","Carbonate the beer"],
+   fact:"Raising the temperature slightly near the end of fermentation speeds up diacetyl uptake by the yeast."},
+  {cat:"Technique", q:"What's the best way to assess a beer's aroma?",
+   a:"Short sniffs, then a longer one, with breaks", w:["One long deep inhale","Hold your nose and taste","Smell only after swallowing"],
+   fact:"Our nose adapts fast. Short sniffs and breaks prevent 'nose fatigue'; volatile aromas often disappear within minutes."},
+  {cat:"Technique", q:"Retronasal aroma is picked up…",
+   a:"From the back of the mouth after swallowing", w:["Only with the tip of the tongue","Through the eyes","By swirling without tasting"],
+   fact:"Breathing out through the nose after swallowing carries aroma from the mouth up to the olfactory receptors, giving you 'flavour'."},
+  {cat:"Taste", q:"Which of these is a basic taste, not an aroma?",
+   a:"Bitter", w:["Banana","Clove","Cardboard"],
+   fact:"The basic tastes are sweet, sour, salty, bitter and umami. Most of what we call 'flavour' is actually aroma."},
+  {cat:"Mouthfeel", q:"Astringency in beer is best described as…",
+   a:"A drying, puckering, mouth-coating sensation", w:["A sweet syrupy taste","A sour vinegar note","A fizzy prickle"],
+   fact:"It's a tactile sensation, often from polyphenols (tannins) extracted by over-sparging or hot grain husks."},
+  {cat:"Process", q:"Which part of the hop gives beer its bitterness?",
+   a:"Alpha acids, isomerised during the boil", w:["Hop oils added cold","Hop leaves' chlorophyll","Beta-glucans"],
+   fact:"Alpha acids are not very soluble until boiling converts them into iso-alpha-acids, which are both bitter and soluble."},
+  {cat:"Process", q:"Why do brewers add aroma hops late or dry-hop?",
+   a:"Hop oils are volatile and boil off", w:["To increase bitterness","To make the beer darker","To kill bacteria"],
+   fact:"The longer hops boil, the more bitterness and the less aroma you get."},
+  {cat:"Taste", q:"A 'sweet, caramel, toffee' character usually comes from…",
+   a:"Crystal / caramel malts", w:["Dry hopping","Lager yeast","Chlorinated water"],
+   fact:"Crystal malts are stewed and kilned so their sugars caramelise inside the husk."},
+  {cat:"Taste", q:"'Roasty, coffee, dark chocolate' notes come from…",
+   a:"Highly roasted malts and barley", w:["Fresh hops","High fermentation temperature","Bacterial infection"],
+   fact:"Roasting at high temperatures drives Maillard reactions and pyrolysis, giving stouts and porters their colour and roast."},
+];
+
+/* ============ QUESTION BUILDER ============ */
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a; };
+/* Core 32: the core set of tasting standards */
+const CORE_NAMES = ["Acetaldehyde","Acetic acid","Ethyl butyrate","Ethyl hexanoate","Isoamyl acetate","Eugenol",
+ "4-Vinyl guaiacol","2,6-Dichlorophenol","Butyric acid","2-Aminoacetophenone","Alpha-pinene","Hop oil extract",
+ "Sucrose octaacetate","Sucralose","Citric acid","Ferrous sulphate","Geraniol","D-Limonene","Oxidized",
+ "Dimethyl sulphide","Methanethiol","4-Mercapto-4-methylpentan-2-one","Isovaleric acid","Sodium bicarbonate",
+ "2,3-Butanedione","3-Methyl-2-butene-1-thiol","trans-2-Nonenal","2,4,6-Trichloroanisole","Isobutyraldehyde",
+ "Hydrogen sulphide","Dimethyl trisulphide","Kettle hop extract"];
+const CORE_IDS = new Set(CORE_NAMES.map(n=>{ const c=COMPOUNDS.find(x=>x.name===n); if(!c) console.error("Core set missing",n); return c&&c.id; }).filter(x=>x!==undefined));
+const inTopic = (k,c) => { const t=TOPICS[k]; return t.ids ? t.ids.has(c.id) : (!t.cats || t.cats.includes(c.cat)); };
+const TOPICS = {
+  all:{label:"Everything", cats:null},
+  core:{label:"⭐ Core 32", ids:CORE_IDS},
+  faults:{label:"Off-flavours & taints", cats:["Infection","Taint","Process","Ageing"]},
+  yeast:{label:"Yeast", cats:["Yeast"]},
+  hops:{label:"Hops", cats:["Hops"]},
+  malt:{label:"Malt", cats:["Malt"]},
+  adj:{label:"Spices, fruit & oak", cats:["Adjunct"]},
+  taste:{label:"Taste & mouthfeel", cats:["Taste"]},
+};
+let TOPIC="all";
+/* coverage: which standards this player has answered correctly */
+let MET=new Set();
+try{ MET=new Set(JSON.parse(localStorage.getItem("nk_met")||"[]")); }catch(e){}
+function saveMet(){ try{ localStorage.setItem("nk_met",JSON.stringify([...MET])); }catch(e){} if(typeof pushProgress==="function") pushProgress(); }
+
+/* 3 distractors from different confusion-groups, with distinct values for the field */
+let DPOOL=null;
+function distractors(c, field){
+  const out=[], groups=new Set([c.g]), vals=new Set([c[field]]);
+  for(const o of [...shuffle(DPOOL||COMPOUNDS), ...shuffle(COMPOUNDS)]){
+    if(groups.has(o.g) || vals.has(o[field])) continue;
+    out.push(o); groups.add(o.g); vals.add(o[field]); if(out.length===3) break;
+  }
+  return out;
+}
+function buildQuestions(n){
+  const pool=COMPOUNDS.filter(c=>inTopic(TOPIC,c));
+  DPOOL = pool.length>=12 ? pool : COMPOUNDS;
+  // unmet standards first so players work through the whole list
+  const ordered=[...shuffle(pool.filter(c=>!MET.has(c.id))), ...shuffle(pool.filter(c=>MET.has(c.id)))];
+  const useExtra = TOPIC==="all"||TOPIC==="taste";
+  const extras=useExtra?shuffle(EXTRA):[];
+  const nExtra=Math.min(extras.length, TOPIC==="all"?Math.round(n*0.2):TOPIC==="taste"?Math.max(0,n-pool.length):0);
+  const types=shuffle(["smell","origin","which","smell","which","origin","cat"]);
+  const qs=[];
+  const nComp=Math.min(n-nExtra, ordered.length);
+  for(let i=0;i<nComp;i++){
+    const c=ordered[i % ordered.length], t=types[i%types.length], label=CAT_INFO[c.cat];
+    const base={cid:c.id};
+    const info=`<b>${c.name}</b> (descriptor: “${c.desc}”). Smells like: ${c.aroma}. Origin: ${c.origin}. <i>${c.fact}</i>`;
+    if(t==="smell") qs.push({...base,tag:`${label} · What does it smell like?`, q:`What does <em>${c.name}</em> smell or taste like?`,
+      a:c.aroma, w:distractors(c,"aroma").map(o=>o.aroma), fact:info, short:`${c.name} → ${c.aroma}`});
+    else if(t==="origin") qs.push({...base,tag:`${label} · Where does it come from?`, q:`Where does <em>${c.name}</em> (${c.aroma.split(",")[0].toLowerCase()}) usually come from?`,
+      a:c.origin, w:distractors(c,"origin").map(o=>o.origin), fact:info, short:`${c.name} → ${c.origin}`});
+    else if(t==="which") qs.push({...base,tag:`${label} · Name that compound`, q:`A panellist writes: <em>“${c.aroma.toLowerCase()}”</em>. Which standard is it?`,
+      a:c.name, w:distractors(c,"name").map(o=>o.name), fact:info, short:`“${c.aroma}” → ${c.name}`});
+    else { const others=shuffle(Object.keys(CAT_INFO).filter(k=>k!==c.cat)).slice(0,3);
+      qs.push({...base,tag:`Flavour map · Which family?`, q:`<em>${c.name}</em> (${c.aroma.split(",")[0].toLowerCase()}): which family does it belong to?`,
+      a:label, w:others.map(k=>CAT_INFO[k]), fact:info, short:`${c.name} → ${label}`}); }
+  }
+  extras.slice(0,nExtra).forEach(e=>qs.push({tag:e.cat, q:e.q, a:e.a, w:e.w, fact:`<b>${e.a}.</b> ${e.fact}`, short:`${e.q} → ${e.a}`}));
+  return shuffle(qs);
+}
+
+/* ============ SOUND (Web Audio) ============ */
+let ctx=null, muted=false;
+try{ muted = localStorage.getItem("nk_muted")==="1"; }catch(e){}
+function ac(){ if(!ctx){ try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(ctx&&ctx.state==="suspended") ctx.resume(); return ctx; }
+function tone(f,dur,type="sine",vol=.2,when=0,slide=null){
+  if(muted) return; const c=ac(); if(!c) return;
+  const t=c.currentTime+when, o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t+dur+.05);
+}
+function noise(dur,vol=.2,freq=3000,when=0,q=1,type="bandpass"){
+  if(muted) return; const c=ac(); if(!c) return;
+  const t=c.currentTime+when, b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const s=c.createBufferSource(); s.buffer=b; const f=c.createBiquadFilter(); f.type=type; f.frequency.value=freq; f.Q.value=q;
+  const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f).connect(g).connect(c.destination); s.start(t);
+}
+const SFX={
+  pop(){ tone(380,.12,"sine",.35,0,90); noise(.5,.12,5000,.06,.7,"highpass"); }, // bottle cap + fizz
+  correct(){ [523,659,784,1047].forEach((f,i)=>tone(f,.18,"triangle",.18,i*.07)); },
+  wrong(){ tone(180,.35,"sawtooth",.12,0,110); tone(150,.4,"square",.06,.05,90); },
+  tick(){ tone(1200,.04,"square",.06); },
+  click(){ tone(660,.05,"triangle",.1); },
+  streak(){ [784,988,1175,1568].forEach((f,i)=>tone(f,.12,"sine",.14,i*.05)); },
+  fanfare(){ [[523,0],[659,.15],[784,.3],[1047,.45],[784,.65],[1047,.8]].forEach(([f,w])=>tone(f,.3,"triangle",.2,w)); noise(1.4,.06,6000,.4,.5,"highpass"); },
+  pour(){ noise(1.2,.12,900,0,.8); noise(1.6,.06,5000,.5,.5,"highpass"); },
+};
+
+/* ============ GAME STATE ============ */
+const $=id=>document.getElementById(id);
+let LEVEL={t:15,n:12,name:"Taster"};
+let S={};
+function show(id){ document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); $(id).classList.add("active"); window.scrollTo(0,0); }
+
+function updateMute(){ $("muteBtn").textContent = muted ? "🔇 Sound off" : "🔊 Sound on"; }
+updateMute();
+$("muteBtn").onclick=()=>{ muted=!muted; try{localStorage.setItem("nk_muted",muted?"1":"0")}catch(e){} updateMute(); if(!muted) SFX.click(); };
+
+document.querySelectorAll("#levels .chip").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#levels .chip").forEach(x=>x.classList.remove("sel")); b.classList.add("sel");
+  LEVEL={t:+b.dataset.t,n:+b.dataset.n,name:b.childNodes[0].textContent.trim()}; SFX.click(); showBest();
+});
+function bestKey(){ return "nk_best_"+LEVEL.name; }
+function showBest(){ let b=0; try{ b=+localStorage.getItem(bestKey())||0; }catch(e){} $("bestLine").textContent = b ? `🏆 Your best on ${LEVEL.name}: ${b.toLocaleString()} pts` : `No high score on ${LEVEL.name} yet, set one!`; }
+showBest();
+
+$("startBtn").onclick=startGame;
+$("againBtn").onclick=()=>{ SFX.click(); show("start"); showBest(); renderCover(); };
+
+/* topics */
+function renderTopics(){
+  $("topics").innerHTML=Object.entries(TOPICS).map(([k,t])=>{
+    const n=COMPOUNDS.filter(c=>inTopic(k,c)).length;
+    return `<button class="tchip ${k===TOPIC?"sel":""}" data-k="${k}">${t.label}<small>${n}</small></button>`;}).join("");
+  $("topics").querySelectorAll(".tchip").forEach(b=>b.onclick=()=>{ TOPIC=b.dataset.k; SFX.click(); renderTopics(); });
+}
+renderTopics();
+function renderCover(){
+  $("coverNum").textContent=`${MET.size} / ${COMPOUNDS.length}`;
+  $("coverFill").style.width=(100*MET.size/COMPOUNDS.length)+"%";
+  const tm=[...CORE_IDS].filter(id=>MET.has(id)).length;
+  $("coreNum").textContent=`${tm} / ${CORE_IDS.size}`;
+  $("coreFill").style.width=(100*tm/CORE_IDS.size)+"%";
+}
+renderCover();
+let resetArmed=false;
+$("resetBtn").onclick=()=>{
+  if(!resetArmed){ resetArmed=true; $("resetBtn").textContent="Tap again to confirm"; setTimeout(()=>{resetArmed=false;$("resetBtn").textContent="↺ Reset progress";},3000); return; }
+  MET=new Set(); saveMet(); resetArmed=false; $("resetBtn").textContent="↺ Reset progress"; renderCover(); SFX.wrong();
+};
+
+/* library */
+let LIBCAT="all";
+function renderLib(){
+  const qv=$("libSearch").value.trim().toLowerCase();
+  $("libCats").innerHTML=[["all","All"],["core","⭐ Core 32"],...Object.entries(CAT_INFO)].map(([k,l])=>`<button class="tchip ${k===LIBCAT?"sel":""}" data-k="${k}">${l}</button>`).join("");
+  $("libCats").querySelectorAll(".tchip").forEach(b=>b.onclick=()=>{LIBCAT=b.dataset.k; renderLib();});
+  const items=COMPOUNDS.filter(c=>(LIBCAT==="all"||(LIBCAT==="core"?CORE_IDS.has(c.id):c.cat===LIBCAT)) &&
+    (!qv || [c.name,c.desc,c.aroma,c.origin,c.fact].join(" ").toLowerCase().includes(qv)))
+    .sort((a,b)=>a.desc.localeCompare(b.desc));
+  $("libList").innerHTML = items.length ? items.map(c=>`<div class="lcard"><div class="top"><h4>${MET.has(c.id)?'<span class="met">✓</span> ':''}${c.desc}</h4><span class="d">${CORE_IDS.has(c.id)?"⭐ Core 32 · ":""}${CAT_INFO[c.cat]}</span></div>
+    <p><b>${c.name}</b></p><p><b>Smells like:</b> ${c.aroma}</p><p><b>Origin:</b> ${c.origin}</p><p><b>Tip:</b> ${c.fact}</p></div>`).join("")
+    : `<div class="empty">No standards match “${qv}”.</div>`;
+}
+$("libBtn").onclick=()=>{ SFX.click(); show("library"); renderLib(); };
+$("libBack").onclick=()=>{ SFX.click(); show("start"); renderCover(); };
+$("libSearch").oninput=renderLib;
+
+function startGame(){
+  ac(); SFX.pop();
+  S={qs:buildQuestions(LEVEL.n), newMet:0, i:0, score:0, streak:0, best:0, correct:0, times:[], log:[], fifty:true, skip:true};
+  $("fiftyBtn").disabled=false; $("skipBtn").disabled=false;
+  show("game"); setTimeout(nextQ,350);
+}
+function mult(){ return Math.min(3, 1 + Math.floor(S.streak/2)*0.5); }
+function hud(){
+  $("score").textContent=S.score.toLocaleString();
+  $("streak").textContent=`${S.streak} 🔥`;
+  $("mult").textContent="×"+mult();
+}
+
+let timer=null, tStart=0, lastTick=0, locked=false;
+function nextQ(){
+  if(S.i>=S.qs.length) return endGame();
+  locked=false;
+  const q=S.qs[S.i];
+  $("qnum").textContent=`Question ${S.i+1} of ${S.qs.length}`;
+  $("qtag").textContent=q.tag; $("qtext").innerHTML=q.q;
+  $("feedback").className="feedback";
+  const opts=shuffle([q.a,...q.w]);
+  const box=$("answers"); box.innerHTML="";
+  opts.forEach((o,k)=>{
+    const b=document.createElement("button"); b.className="ans"; b.dataset.v=o;
+    b.innerHTML=`<span class="k">${"ABCD"[k]}</span><span>${o}</span>`;
+    b.onclick=e=>answer(o,b,e); box.appendChild(b);
+  });
+  hud(); startTimer();
+}
+function startTimer(){
+  cancelAnimationFrame(timer); tStart=performance.now(); lastTick=-1;
+  const bar=$("timerbar"); bar.classList.remove("low");
+  const loop=now=>{
+    const el=(now-tStart)/1000, left=Math.max(0,LEVEL.t-el);
+    bar.style.transform=`scaleX(${left/LEVEL.t})`;
+    $("secs").textContent=Math.ceil(left)+"s";
+    if(left<=5){ bar.classList.add("low"); const s=Math.ceil(left); if(s!==lastTick&&s>0){ lastTick=s; SFX.tick(); } }
+    if(left<=0) return answer(null,null);
+    timer=requestAnimationFrame(loop);
+  }; timer=requestAnimationFrame(loop);
+}
+function answer(v,btn,ev){
+  if(locked) return; locked=true; cancelAnimationFrame(timer);
+  const q=S.qs[S.i], el=Math.min(LEVEL.t,(performance.now()-tStart)/1000);
+  const ok = v===q.a;
+  document.querySelectorAll(".ans").forEach(b=>{ b.disabled=true; if(b.dataset.v===q.a){ b.classList.add("right"); b.querySelector(".k").textContent="✓"; } });
+  let gained=0;
+  if(ok){
+    S.streak++; S.best=Math.max(S.best,S.streak); S.correct++;
+    const m=mult(); gained=Math.round((100 + 100*(1-el/LEVEL.t))*m);
+    S.score+=gained; S.times.push(el);
+    if(q.cid!==undefined && !MET.has(q.cid)){ MET.add(q.cid); S.newMet++; saveMet(); }
+    SFX.correct(); if(S.streak>=3 && S.streak%2===1) setTimeout(SFX.streak,250);
+    if(ev) popText(`+${gained}`, ev.clientX, ev.clientY);
+  } else {
+    if(btn){ btn.classList.add("wrong"); btn.querySelector(".k").textContent="✗"; }
+    S.streak=0; SFX.wrong();
+  }
+  S.log.push({ok, short:q.short, skipped:v==="__skip"});
+  hud();
+  const fb=$("feedback");
+  fb.className="feedback show "+(ok?"ok":"no");
+  const lines = ok ? ["Spot on! 👃","Great nose!","Cheers to that! 🍻","Textbook tasting!","Nailed it!"] : (v===null?["Time's up! ⏰"]:v==="__skip"?["Skipped ⏭"]:["Not quite…","Off-flavour! 😬","Back to the tasting room"]);
+  $("fbTitle").textContent = lines[Math.floor(Math.random()*lines.length)] + (ok?`  +${gained}`:"");
+  $("fbText").innerHTML=q.fact;
+  $("nextBtn").textContent = S.i+1>=S.qs.length ? "See results 🏆" : "Next →";
+  $("nextBtn").focus({preventScroll:true});
+  fb.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+$("nextBtn").onclick=()=>{ SFX.click(); S.i++; nextQ(); };
+$("fiftyBtn").onclick=()=>{
+  if(!S.fifty||locked) return; S.fifty=false; $("fiftyBtn").disabled=true; SFX.pour();
+  const q=S.qs[S.i]; const wrongs=shuffle([...document.querySelectorAll(".ans")].filter(b=>b.dataset.v!==q.a)).slice(0,2);
+  wrongs.forEach(b=>b.classList.add("gone"));
+};
+$("skipBtn").onclick=()=>{
+  if(!S.skip||locked) return; S.skip=false; $("skipBtn").disabled=true;
+  // skip: no penalty to streak, no points
+  locked=true; cancelAnimationFrame(timer); SFX.click();
+  const q=S.qs[S.i]; document.querySelectorAll(".ans").forEach(b=>{b.disabled=true; if(b.dataset.v===q.a) b.classList.add("right");});
+  S.log.push({ok:false,short:q.short,skipped:true});
+  const fb=$("feedback"); fb.className="feedback show no"; $("fbTitle").textContent="Skipped ⏭  (streak safe)"; $("fbText").innerHTML=q.fact;
+  $("nextBtn").textContent = S.i+1>=S.qs.length ? "See results 🏆" : "Next →";
+};
+function popText(t,x,y){ const d=document.createElement("div"); d.className="pop"; d.textContent=t; d.style.left=(x-30)+"px"; d.style.top=(y-30)+"px"; document.body.appendChild(d); setTimeout(()=>d.remove(),1000); }
+
+function endGame(){
+  const pct=S.correct/S.qs.length;
+  const ranks=[[.9,"Master Cicerone of the Nose 👑"],[.75,"Head Brewer 🧪"],[.6,"Sensory Panellist 👃"],[.4,"Cellar Hand 🛢️"],[0,"Fresh Off the Bottling Line 🍼"]];
+  $("rank").textContent=ranks.find(r=>pct>=r[0])[1];
+  $("finalScore").textContent=S.score.toLocaleString();
+  let best=0, isBest=false;
+  try{ best=+localStorage.getItem(bestKey())||0; if(S.score>best){ localStorage.setItem(bestKey(),S.score); isBest=true; } }catch(e){}
+  $("endSub").textContent = (isBest ? `🏆 New ${LEVEL.name} high score!` : best ? `${LEVEL.name} best: ${best.toLocaleString()}` : `${LEVEL.name} level`)
+    + ` · ${S.newMet} new standard${S.newMet===1?"":"s"} mastered (${MET.size}/${COMPOUNDS.length})`;
+  $("eCorrect").textContent=`${S.correct}/${S.qs.length}`;
+  $("eStreak").textContent=S.best;
+  $("eTime").textContent = S.times.length ? (S.times.reduce((a,b)=>a+b,0)/S.times.length).toFixed(1)+"s" : "–";
+  $("review").innerHTML = S.log.map(l=>`<div class="ritem"><div class="dot ${l.ok?'y':'n'}">${l.ok?'✓':(l.skipped?'–':'✗')}</div><div>${l.short}</div></div>`).join("");
+  show("end"); if(typeof pushProgress==="function") pushProgress();
+  if(pct>=.6){ SFX.fanfare(); confetti(); } else SFX.pour();
+}
+
+/* ============ VISUALS ============ */
+(function bubbles(){
+  const host=$("bubbles");
+  for(let i=0;i<26;i++){
+    const b=document.createElement("div"); b.className="bubble"; const s=4+Math.random()*12;
+    b.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${7+Math.random()*10}s;animation-delay:-${Math.random()*15}s;--drift:${(Math.random()-.5)*60}px;opacity:${.25+Math.random()*.4}`;
+    host.appendChild(b);
+  }
+})();
+function confetti(){
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const c=$("confetti"), x=c.getContext("2d"); c.width=innerWidth; c.height=innerHeight;
+  const cols=["#f2a516","#ffcb4d","#fff6e3","#5fd38a","#c9700a"];
+  const P=Array.from({length:140},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,r:Math.random()*6.28,s:5+Math.random()*7,c:cols[Math.floor(Math.random()*cols.length)]}));
+  let f=0; (function draw(){ x.clearRect(0,0,c.width,c.height);
+    P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.r+=.1; x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore();});
+    if(++f<220) requestAnimationFrame(draw); else x.clearRect(0,0,c.width,c.height); })();
+}
+document.addEventListener("keydown",e=>{
+  if(!$("game").classList.contains("active")) return;
+  const k="abcd".indexOf(e.key.toLowerCase()); const btns=document.querySelectorAll(".ans");
+  if(k>=0 && btns[k] && !locked) btns[k].click();
+  if(e.key==="Enter" && locked) $("nextBtn").click();
+});
+
+
+/* ================================================================
+   NO-ACCOUNT MODE (peer-to-peer)
+   When the page is opened from a normal web address (not inside Claude),
+   the host's browser *is* the server: it keeps the game data in memory and
+   players' browsers connect straight to it with WebRTC via PeerJS.
+   Same game logic as Claude mode: it talks to a small db look-alike.
+   ================================================================ */
+const PEER_PREFIX="nose-knows-core32-v1-";
+const PEERJS_SRC=["https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js","https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js","https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"];
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+async function loadPeerJs(){ if(window.Peer) return true; for(const s of PEERJS_SRC){ try{ await loadScript(s); if(window.Peer) return true; }catch(e){} } return false; }
+const jclone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
+function deepMerge(a,b){ for(const [k,v] of Object.entries(b)){ if(v&&typeof v==="object"&&!Array.isArray(v)&&a[k]&&typeof a[k]==="object"&&!Array.isArray(a[k])) deepMerge(a[k],v); else a[k]=v; } return a; }
+const colOf=p=>p.split("/").slice(0,-1).join("/");
+
+/* in-memory store with the same calls the game uses on Claude's db */
+function makeLocalDb(onWrite){
+  const store=new Map(), dl=new Map(), cl=new Map();
+  const add=(m,k,f)=>{ if(!m.has(k)) m.set(k,new Set()); m.get(k).add(f); return ()=>m.get(k).delete(f); };
+  const snap=p=>{ const d=store.get(p); return {id:p.split("/").pop(),exists:d!==undefined,data:()=>jclone(d),metadata:{fromCache:false,hasPendingWrites:false}}; };
+  const qsnap=c=>{ const docs=[...store.keys()].filter(k=>colOf(k)===c).sort().map(snap); return {docs,size:docs.length,empty:!docs.length,docChanges:()=>[],metadata:{fromCache:false,hasPendingWrites:false}}; };
+  function write(op,p,d){
+    if(op==="set") store.set(p,jclone(d));
+    else if(op==="update"){ if(!store.has(p)) throw {code:"invalid_argument"}; store.set(p,deepMerge(store.get(p),jclone(d))); }
+    else if(op==="delete") store.delete(p);
+    (dl.get(p)||[]).forEach(f=>setTimeout(()=>f(snap(p))));
+    const c=colOf(p); (cl.get(c)||[]).forEach(f=>setTimeout(()=>f(qsnap(c))));
+    if(onWrite) onWrite(p,store.get(p));
+  }
+  const doc=p=>({id:p.split("/").pop(),path:p,get:async()=>snap(p),set:async d=>write("set",p,d),update:async d=>write("update",p,d),
+    delete:async()=>write("delete",p),acquire:async()=>({acquired:true}),
+    onSnapshot:f=>{ const u=add(dl,p,f); setTimeout(()=>f(snap(p))); return u; },collection:c=>col(p+"/"+c)});
+  const col=c=>{ const q={path:c,where:()=>q,orderBy:()=>q,limit:()=>q,doc:id=>doc(c+"/"+(id||Math.random().toString(36).slice(2))),
+    get:async()=>qsnap(c),onSnapshot:f=>{ const u=add(cl,c,f); setTimeout(()=>f(qsnap(c))); return u; },add:async d=>{ const r=q.doc(); await r.set(d); return r; }}; return q; };
+  return {doc,collection:col,_write:write,_get:p=>jclone(store.get(p)),_dump:()=>Object.fromEntries(store),_load:o=>Object.entries(o||{}).forEach(([k,v])=>store.set(k,v))};
+}
+
+const NET={peer:null,code:null,conns:new Set(),local:null,saveT:null,remote:null};
+function peerOnce(id){
+  return new Promise((res,rej)=>{
+    let p; try{ p=id?new Peer(id,{debug:0}):new Peer({debug:0}); }catch(e){ return rej({type:"init"}); }
+    const t=setTimeout(()=>{ try{p.destroy()}catch(e){} rej({type:"timeout"}); },12000);
+    p.on("open",()=>{ clearTimeout(t); res(p); });
+    p.on("error",e=>{ clearTimeout(t); try{p.destroy()}catch(x){} rej({type:e&&e.type||"error"}); });
+  });
+}
+
+/* ---------- host side ---------- */
+function p2pSave(){ clearTimeout(NET.saveT); NET.saveT=setTimeout(()=>lsSet("nk_p2p_"+NET.code,NET.local._dump()),400); }
+function p2pBroadcast(path,data){ for(const c of NET.conns){ try{ c.send({push:path,data}); }catch(e){} } }
+function p2pOnline(){ H.online=new Set([...NET.conns].map(c=>c._pid).filter(Boolean)); if(typeof renderHostPlayersOnly==="function") renderHostPlayersOnly(); }
+async function p2pHostStart(resumeCode){
+  if(!(await loadPeerJs())) throw {msg:"Couldn't load the connection library. Check your internet connection."};
+  for(let i=0;i<(resumeCode?8:10);i++){
+    const code=resumeCode||genCode();
+    try{
+      const peer=await peerOnce(PEER_PREFIX+code);
+      NET.peer=peer; NET.code=code; NET.conns=new Set();
+      NET.local=makeLocalDb((p,d)=>{ p2pSave(); if(p==="rooms/"+code) p2pBroadcast(p,d); });
+      if(resumeCode) NET.local._load(lsGet("nk_p2p_"+code,{}));
+      L.db=NET.local;
+      peer.on("connection",conn=>{
+        conn.on("open",()=>{ NET.conns.add(conn); const r=NET.local._get("rooms/"+code); if(r) try{ conn.send({push:"rooms/"+code,data:r}); }catch(e){} });
+        conn.on("data",m=>p2pServe(conn,m));
+        conn.on("close",()=>{ NET.conns.delete(conn); p2pOnline(); });
+        conn.on("error",()=>{ NET.conns.delete(conn); p2pOnline(); });
+      });
+      peer.on("disconnected",()=>{ try{ peer.reconnect(); }catch(e){} });  // lost the broker; existing player links keep working
+      return code;
+    }catch(e){
+      if(e.type==="unavailable-id"){ if(resumeCode){ await sleep(2000); continue; } continue; }
+      throw {msg:"Couldn't open a game room ("+e.type+"). Your network may block live connections; try another Wi-Fi or a phone hotspot."};
+    }
+  }
+  throw {msg:"Couldn't get a free room code. Try again."};
+}
+function p2pServe(conn,m){
+  if(m&&m.hello&&typeof m.hello==="string"&&/^[A-Za-z0-9_\-.~:@+]{1,120}$/.test(m.hello)){ if(!conn._pid){ conn._pid=m.hello; p2pOnline(); } return; }
+  if(!m||typeof m!=="object"||!m.id) return;
+  const reply=o=>{ try{ conn.send({id:m.id,...o}); }catch(e){} };
+  const base="rooms/"+NET.code, path=String(m.path||"");
+  const isPlayerDoc=/^rooms\/[A-Z]{4}\/players\/[A-Za-z0-9_\-.~:@+]{1,120}$/.test(path)&&path.startsWith(base+"/players/");
+  try{
+    if(m.op==="get"){
+      if(path!==base&&!isPlayerDoc) return reply({ok:true,data:null});          // answer key etc. never leave the host
+      return reply({ok:true,data:NET.local._get(path)??null});
+    }
+    if((m.op==="set"||m.op==="update")&&isPlayerDoc){
+      const pid=path.split("/")[3];
+      if(conn._pid&&conn._pid!==pid) return reply({ok:false,code:"invalid_argument"});
+      if(JSON.stringify(m.data||{}).length>20000) return reply({ok:false,code:"invalid_argument"});
+      NET.local._write(m.op,path,m.data||{});
+      if(!conn._pid){ conn._pid=pid; p2pOnline(); }
+      return reply({ok:true});
+    }
+    reply({ok:false,code:"invalid_argument"});
+  }catch(e){ reply({ok:false,code:(e&&e.code)||"invalid_argument"}); }
+}
+function p2pHostStop(){ try{ NET.peer&&NET.peer.destroy(); }catch(e){} NET.peer=null; NET.conns=new Set(); }
+
+/* ---------- player side: a db look-alike that forwards calls to the host ---------- */
+async function p2pConnect(code){
+  if(!(await loadPeerJs())) throw {msg:"Couldn't load the connection library. Check your internet connection."};
+  if(NET.remote) NET.remote.close();
+  if(!NET.peer||NET.peer.destroyed){ try{ NET.peer=await peerOnce(null); }catch(e){ throw {msg:"Couldn't connect ("+e.type+"). Your network may block live connections; try mobile data instead of Wi-Fi."}; } }
+  const peer=NET.peer, target=PEER_PREFIX+code;
+  const R={conn:null,pending:new Map(),cache:new Map(),subs:new Map(),closed:false,n:0,status:null};
+  const fire=p=>{ const d=R.cache.get(p); (R.subs.get(p)||[]).forEach(f=>f({id:p.split("/").pop(),exists:d!=null,data:()=>jclone(d),metadata:{fromCache:false,hasPendingWrites:false}})); };
+  function open(first){
+    return new Promise((res,rej)=>{
+      let done=false; const c=peer.connect(target,{reliable:true,serialization:"json"});
+      const fail=type=>{ if(done) return; done=true; peer.off&&peer.off("error",onErr); rej({type}); };
+      const onErr=e=>{ if(e&&e.type==="peer-unavailable") fail("peer-unavailable"); };
+      peer.on("error",onErr);
+      const t=setTimeout(()=>fail("timeout"),first?10000:8000);
+      c.on("open",()=>{ if(done) return; done=true; clearTimeout(t); R.conn=c; try{ c.send({hello:L.pid}); }catch(e){} R.status&&R.status(true); res(); });
+      c.on("data",m=>{
+        if(m&&m.push){ R.cache.set(m.push,m.data); fire(m.push); return; }
+        const p=m&&R.pending.get(m.id); if(!p) return; R.pending.delete(m.id); clearTimeout(p.t);
+        m.ok?p.res(m.data):p.rej({code:m.code||"invalid_argument"});
+      });
+      c.on("close",()=>{ if(R.conn===c){ R.conn=null; R.status&&R.status(false); if(!R.closed) reconnect(); } });
+      c.on("error",()=>{});
+    });
+  }
+  let reconnecting=false;
+  async function reconnect(){
+    if(reconnecting) return; reconnecting=true;
+    for(let i=0;!R.closed&&!R.conn;i++){ await sleep(Math.min(5000,1000+i*500)); try{ if(NET.peer.disconnected) NET.peer.reconnect(); await open(false); }catch(e){} }
+    reconnecting=false;
+  }
+  function call(op,path,data){
+    return new Promise((res,rej)=>{
+      if(!R.conn){ reconnect(); return rej({code:"unavailable"}); }
+      const id="m"+(++R.n)+Math.random().toString(36).slice(2,6);
+      const t=setTimeout(()=>{ R.pending.delete(id); rej({code:"unavailable"}); },8000);
+      R.pending.set(id,{res,rej,t});
+      try{ R.conn.send({id,op,path,data}); }catch(e){ clearTimeout(t); R.pending.delete(id); rej({code:"unavailable"}); }
+    });
+  }
+  try{ await open(true); }
+  catch(e){ throw e.type==="peer-unavailable" ? {msg:"No game found with code "+code+". Check the code, and that the trainer's game screen is still open."}
+                                              : {msg:"Couldn't reach the trainer's screen. Check you're online; some work Wi-Fi blocks live connections (try mobile data)."}; }
+  const doc=p=>({id:p.split("/").pop(),path:p,
+    get:async()=>{ const d=await call("get",p); if(p.split("/").length===2&&d) R.cache.set(p,d); return {id:p.split("/").pop(),exists:d!=null,data:()=>jclone(d),metadata:{fromCache:false,hasPendingWrites:false}}; },
+    set:d=>call("set",p,d), update:d=>call("update",p,d), delete:()=>Promise.resolve(), acquire:async()=>({acquired:true}),
+    onSnapshot:f=>{ if(!R.subs.has(p)) R.subs.set(p,new Set()); R.subs.get(p).add(f); if(R.cache.has(p)) setTimeout(()=>fire(p)); return ()=>R.subs.get(p).delete(f); },
+    collection:c=>({get:async()=>({docs:[],size:0,empty:true}),onSnapshot:()=>()=>{}})});
+  NET.remote={doc,collection:c=>({doc:id=>doc(c+"/"+id),where(){return this},limit(){return this},get:async()=>({docs:[],size:0,empty:true}),onSnapshot:()=>()=>{}}),
+    close:()=>{ R.closed=true; try{ R.conn&&R.conn.close(); }catch(e){} }, onStatus:f=>{ R.status=f; }};
+  return NET.remote;
+}
+
+/* ================================================================
+   LIVE MULTIPLAYER
+   Host-authoritative: the host device owns rooms/<CODE> (game state).
+   Each player writes only rooms/<CODE>/players/<pid> (name, team, answers).
+   The host freezes answers when a question closes and scores from that,
+   so late writes never change results. room "nudge" messages make updates
+   arrive fast; db snapshots + polling make it work without them.
+   ================================================================ */
+const ARTIFACT_URL = "";
+const SHAPES=["▲","◆","●","■"];
+const TEAMS=[{k:"hops",n:"Hops",e:"🌿"},{k:"malt",n:"Malt",e:"🌾"},{k:"yeast",n:"Yeast",e:"🧫"},{k:"water",n:"Water",e:"💧"}];
+const GRACE_MS=2000;
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const rich=s=>esc(s).replace(/&lt;(\/?)(em|b|i)&gt;/g,"<$1$2>");   // only allow our own simple tags from shared data
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v)) }catch(e){}};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const teamOf=k=>TEAMS.find(t=>t.k===k);
+const L={db:null,user:null,room:null,uid:null,pid:null,state:"loading"};
+
+function safeSeg(s){ return String(s).replace(/[^A-Za-z0-9_\-.~:@+]/g,"_").slice(0,120); }
+function localPid(){ let p=lsGet("nk_pid",null); if(!p){ p="p"+Math.random().toString(36).slice(2,10)+Date.now().toString(36); lsSet("nk_pid",p);} return p; }
+function genCode(){ const A="ABCDEFGHJKLMNPQRSTUVWXYZ"; let c=""; for(let i=0;i<4;i++) c+=A[Math.floor(Math.random()*A.length)]; return c; }
+function errCode(e){ return (e&&e.code)||"unavailable"; }
+function friendlyErr(e){
+  const c=errCode(e);
+  if(c==="invalid_argument"||c==="not_granted") return "Your access to this page doesn't allow playing live. Ask the trainer to share it with you as a Contributor (not Viewer).";
+  if(c==="resource_exhausted") return "Too many requests at once. Wait a few seconds and try again.";
+  if(c==="quota_exceeded") return "The game's storage is full. Ask the trainer to start a new game page.";
+  if(c==="revoked") return "Your access to this page changed. Reload the page.";
+  return "Connection problem. Check your internet and try again.";
+}
+async function retry(fn,tries=3){ let last; for(let i=0;i<tries;i++){ try{ return await fn(); }catch(e){ last=e; const c=errCode(e); if(c!=="unavailable"&&c!=="resource_exhausted") throw e; await sleep(400+Math.random()*700*(i+1)); } } throw last; }
+
+/* ---------- capability start-up ---------- */
+(async function initLive(){
+  let tries=0; while(!(window.claude&&window.claude.use) && tries<20){ await sleep(150); tries++; }
+  if(window.claude&&window.claude.use){
+    const get=n=>window.claude.use(n).catch(()=>null);
+    [L.db,L.user,L.room]=await Promise.all([get("db"),get("user"),get("room")]);
+    if(L.user){ try{ L.uid=await L.user.id(); }catch(e){} }
+  }
+  L.pid=safeSeg(L.uid||localPid());
+  L.mode = L.db ? "claude" : (window.claude&&window.claude.use) ? "off" : "p2p";
+  L.state = L.mode==="off" ? "off" : "ready";
+  renderLiveStatus();
+  pullProgress();
+  handleHash();
+})();
+window.addEventListener("hashchange",handleHash);
+function handleHash(){
+  const m=(location.hash||"").match(/^#join-([A-Za-z]{4})$/);
+  if(m){ openLiveMenu(); $("joinCode").value=m[1].toUpperCase(); setTimeout(()=>$("joinName").focus(),50); }
+}
+
+/* ---------- progress sync across a person's devices ---------- */
+let pushTimer=null;
+function progressRef(){ return (L.db&&L.uid) ? L.db.doc(`data/users/${safeSeg(L.uid)}/progress`) : null; }
+async function pullProgress(){
+  const ref=progressRef(); if(!ref) return;
+  try{
+    const s=await ref.get(); if(!s.exists) return;
+    const d=s.data()||{}; let changed=false;
+    (d.met||[]).forEach(id=>{ if(Number.isInteger(id)&&COMPOUNDS[id]&&!MET.has(id)){ MET.add(id); changed=true; } });
+    Object.entries(d.best||{}).forEach(([k,v])=>{ try{ if(+v>(+localStorage.getItem(k)||0)) localStorage.setItem(k,String(+v)); }catch(e){} });
+    if(changed){ try{ localStorage.setItem("nk_met",JSON.stringify([...MET])); }catch(e){} }
+    renderCover(); showBest(); $("syncNote").textContent="☁️ Progress synced across your devices";
+  }catch(e){}
+}
+function pushProgress(){
+  const ref=progressRef(); if(!ref) return;
+  clearTimeout(pushTimer);
+  pushTimer=setTimeout(async()=>{
+    const best={}; ["Apprentice","Taster","Brewmaster","Marathon"].forEach(n=>{ try{ const v=+localStorage.getItem("nk_best_"+n)||0; if(v) best["nk_best_"+n]=v; }catch(e){} });
+    try{ await ref.set({met:[...MET],best,updatedAt:Date.now()}); }catch(e){}
+  },1500);
+}
+
+/* ---------- live menu ---------- */
+const HOSTCFG=lsGet("nk_hostcfg",{topic:"core",n:15,secs:20,teams:false,auto:false});
+if(!TOPICS[HOSTCFG.topic]) HOSTCFG.topic="core";
+function openLiveMenu(){ show("liveMenu"); renderHostSetup(); renderLiveStatus(); renderResume(); const pl=lsGet("nk_player",null); if(pl&&!$("joinName").value) $("joinName").value=pl.name||""; }
+function renderLiveStatus(){
+  const el=$("liveStatus"); if(!el) return;
+  const can = L.state==="ready";
+  el.textContent = L.state==="loading" ? "Connecting…"
+    : L.mode==="p2p" ? (location.protocol==="file:" ? "No-account mode. You opened this file from your computer, so players can't reach it. Put the file on a website (see the note at the top of the file), then host from that web address."
+                                                    : "No-account mode: nobody needs to sign in. The trainer's screen runs the game, so keep it open (and awake) until the end.")
+    : can ? "" : "Live games need you to be signed in to Claude and opening this page from its claude.ai link. Solo play still works.";
+  el.style.display = el.textContent ? "block":"none";
+  ["joinBtn","hostBtn"].forEach(id=>{ const b=$(id); if(b) b.disabled=!can; });
+}
+function chipRow(id,items,cur,onPick){
+  const el=$(id); el.innerHTML=items.map(([v,l])=>`<button class="tchip ${String(v)===String(cur)?"sel":""}" data-v="${esc(v)}">${l}</button>`).join("");
+  el.querySelectorAll(".tchip").forEach(b=>b.onclick=()=>{ SFX.click(); onPick(b.dataset.v); });
+}
+function renderHostSetup(){
+  chipRow("hostTopics",Object.entries(TOPICS).map(([k,t])=>[k,`${t.label}<small>${COMPOUNDS.filter(c=>inTopic(k,c)).length}</small>`]),HOSTCFG.topic,v=>{HOSTCFG.topic=v;renderHostSetup();});
+  chipRow("hostCount",[[10,"10"],[15,"15"],[20,"20"],[32,"32"]],HOSTCFG.n,v=>{HOSTCFG.n=+v;renderHostSetup();});
+  chipRow("hostSecs",[[10,"10s"],[15,"15s"],[20,"20s"],[30,"30s"],[45,"45s"]],HOSTCFG.secs,v=>{HOSTCFG.secs=+v;renderHostSetup();});
+  chipRow("hostTeams",[["0","Individual"],["1","Teams 🌿🌾🧫💧"]],HOSTCFG.teams?"1":"0",v=>{HOSTCFG.teams=v==="1";renderHostSetup();});
+  lsSet("nk_hostcfg",HOSTCFG);
+}
+async function renderResume(){
+  const box=$("resumeBox"); box.innerHTML=""; if(L.state!=="ready") return;
+  const h=lsGet("nk_host",null), p=lsGet("nk_player",null), parts=[];
+  for(const [kind,o] of [["host",h],["player",p]]){
+    if(!o||!o.code) continue;
+    if(L.mode==="p2p"){
+      if(kind==="player"){ parts.push([kind,o.code]); continue; }
+      const st=lsGet("nk_p2p_"+o.code,{}), r=st["rooms/"+o.code];
+      if(r&&r.status!=="end") parts.push([kind,o.code]); else lsSet("nk_host",null);
+      continue;
+    }
+    try{ const s=await L.db.doc("rooms/"+o.code).get(); if(s.exists&&s.data().status&&s.data().status!=="end") parts.push([kind,o.code]); else lsSet(kind==="host"?"nk_host":"nk_player",null); }catch(e){}
+  }
+  box.innerHTML=parts.map(([k,c])=>`<button class="big alt" data-k="${k}" data-c="${esc(c)}">${k==="host"?"🖥️ Resume hosting":"📱 Rejoin"} game ${esc(c)}</button>`).join("");
+  box.querySelectorAll("button").forEach(b=>b.onclick=()=> b.dataset.k==="host" ? resumeHost(b.dataset.c) : joinGame(b.dataset.c,(lsGet("nk_player",{}).name)||"Player"));
+}
+function liveMsg(t){ const el=$("liveMsg"); el.textContent=t||""; el.style.display=t?"block":"none"; }
+
+/* ---------- named room (presence + fast nudges) ---------- */
+async function joinNamedRoom(code,presence,onNudge,onPeers){
+  if(!L.room) return null;
+  try{
+    const r=await L.room.join("nk-"+code.toLowerCase());
+    r.presence(presence).catch(()=>{});
+    r.on("nudge",m=>{ if(!m.sameTab) onNudge(m.data||{}); },()=>{});
+    if(onPeers) r.onPeers(ch=>onPeers(ch.peers),()=>{});
+    return r;
+  }catch(e){ return null; }
+}
+function nudge(r,data){ if(r) r.emit("nudge",data).catch(()=>{}); }
+
+/* ================================================================
+   HOST
+   ================================================================ */
+const H={code:null,room:null,qs:null,frozen:{},players:{},online:null,unsub:null,poll:null,timer:null,deadline:0,chain:Promise.resolve(),kchain:Promise.resolve(),nr:null,lastTick:-1,auto:null,closing:false};
+function buildLive(cfg){
+  const sT=TOPIC, sM=MET; TOPIC=cfg.topic; MET=new Set(); let qs;
+  try{ qs=buildQuestions(cfg.n); } finally{ TOPIC=sT; MET=sM; }
+  return qs.map(q=>{ const opts=shuffle([q.a,...q.w]); return {tag:q.tag,q:q.q,opts,ci:opts.indexOf(q.a),fact:q.fact,short:q.short,cid:q.cid??null}; });
+}
+async function hostCreate(){
+  if(L.state!=="ready") return; liveMsg(""); ac(); SFX.pop();
+  const btn=$("hostBtn"); btn.disabled=true; btn.textContent="Creating room…";
+  try{
+    let code=null;
+    if(L.mode==="p2p") code=await p2pHostStart();
+    for(let i=0;i<10&&!code;i++){
+      const c=genCode(), ref=L.db.doc("rooms/"+c);
+      try{ const lease=await ref.acquire({holder:L.pid+"-"+Date.now(),ttlMs:8000}); if(!lease.acquired) continue; }catch(e){ if(errCode(e)==="invalid_argument") throw e; }
+      const s=await ref.get(); const d=s.exists?s.data():null;
+      if(d&&d.status&&d.status!=="end"&&Date.now()-(d.updatedAt||0)<12*3600e3) continue;
+      code=c;
+    }
+    if(!code) throw {code:"unavailable"};
+    const cfg={...HOSTCFG}, qs=buildLive(cfg), hostKey=Math.random().toString(36).slice(2)+Date.now().toString(36);
+    H.code=code; H.qs=qs; H.frozen={}; H.players={};
+    H.room={v:1,code,status:"lobby",seq:1,qi:-1,total:qs.length,dur:cfg.secs,topic:cfg.topic,topicLabel:TOPICS[cfg.topic].label,teams:!!cfg.teams,
+      q:null,correct:null,fact:"",counts:null,answered:0,board:[],teamBoard:[],hard:[],createdAt:Date.now(),updatedAt:Date.now()};
+    await retry(()=>L.db.doc(`rooms/${code}/host/keys`).set({hostKey,qs,frozen:{},cfg,createdAt:Date.now()}));
+    await retry(()=>L.db.doc("rooms/"+code).set(H.room));
+    lsSet("nk_host",{code,hostKey});
+    await startHost();
+    if(L.mode==="claude") cleanupOldRooms();
+  }catch(e){ liveMsg(e&&e.msg?e.msg:friendlyErr(e)); }
+  btn.disabled=false; btn.textContent="Host on this screen 🖥️";
+}
+async function resumeHost(code){
+  liveMsg("");
+  try{
+    const h=lsGet("nk_host",null); if(!h||h.code!==code) throw {code:"invalid_argument"};
+    if(L.mode==="p2p") await p2pHostStart(code);
+    const [ks,rs]=await Promise.all([L.db.doc(`rooms/${code}/host/keys`).get(),L.db.doc("rooms/"+code).get()]);
+    if(!ks.exists||!rs.exists||ks.data().hostKey!==h.hostKey){ liveMsg("This game can only be resumed on the device that created it."); return; }
+    const k=ks.data(); H.code=code; H.qs=k.qs; H.frozen=k.frozen||{}; H.room={...rs.data()};
+    await startHost();
+    if(H.room.status==="question"){ const left=H.room.dur*1000-(Date.now()-(H.room.openedAt||Date.now())); startHostTimer(Math.max(1500,left)); }
+  }catch(e){ liveMsg(e&&e.msg?e.msg:friendlyErr(e)); }
+}
+async function startHost(){
+  document.body.classList.add("hosting"); show("host"); renderHost();
+  if(H.unsub) H.unsub();
+  const col=L.db.collection(`rooms/${H.code}/players`);
+  H.unsub=col.onSnapshot(s=>onPlayers(s.docs),()=>{});
+  clearInterval(H.poll);
+  H.poll=setInterval(()=>{ if(H.room&&(H.room.status==="question"||H.room.status==="lobby")) col.get().then(s=>onPlayers(s.docs)).catch(()=>{}); },3000);
+  H.nr=await joinNamedRoom(H.code,{role:"host"},()=>col.get().then(s=>onPlayers(s.docs)).catch(()=>{}),peers=>{
+    H.online=new Set(peers.filter(p=>p.presence&&p.presence.role==="player"&&p.presence.pid).map(p=>String(p.presence.pid)));
+    renderHostPlayersOnly();
+  });
+}
+function onPlayers(docs){
+  const m={}; docs.forEach(d=>{ if(d.exists){ const v=d.data(); if(v&&typeof v==="object") m[d.id]=v; } }); H.players=m;
+  if(!H.room) return;
+  if(H.room.status==="question"){
+    const qi=H.room.qi, need=activePids();
+    const answered=need.filter(p=>validAns(m[p],qi)).length;
+    const el=$("hAnswered"); if(el) el.textContent=`${Object.keys(m).filter(p=>validAns(m[p],qi)).length} / ${Object.keys(m).length} answered`;
+    if(need.length && answered>=need.length && !H.closing){ H.closing=true; setTimeout(closeQuestion,700); }
+  } else renderHostPlayersOnly();
+}
+function activePids(){ const all=Object.keys(H.players); if(!H.online||!H.online.size) return all; const on=all.filter(p=>H.online.has(p)); return on.length?on:all; }
+function validAns(p,qi){ const a=p&&p.a&&p.a["q"+qi]; return !!(a&&Number.isInteger(a.c)&&a.c>=0&&a.c<4&&typeof a.t==="number"&&a.t>=0&&a.t<=H.room.dur*1000+GRACE_MS); }
+function hostWrite(patch){
+  Object.assign(H.room,patch); H.room.seq=(H.room.seq||0)+1; H.room.updatedAt=Date.now();
+  const body=JSON.parse(JSON.stringify(H.room)), code=H.code;
+  H.chain=H.chain.then(()=>retry(()=>L.db.doc("rooms/"+code).set(body))).then(()=>{ nudge(H.nr,{seq:body.seq}); hostNet(true); }).catch(e=>{ hostNet(false,e); });
+  renderHost(); return H.chain;
+}
+function keysWrite(patch){ const code=H.code; H.kchain=H.kchain.then(()=>retry(()=>L.db.doc(`rooms/${code}/host/keys`).update(patch))).catch(()=>{}); }
+function hostNet(ok,e){ const el=$("hNet"); if(el){ el.textContent= ok?"● Live":"⚠ "+friendlyErr(e); el.className="net "+(ok?"ok":"bad"); } }
+
+function openQuestion(qi){
+  clearTimeout(H.auto); H.closing=false;
+  const q=H.qs[qi];
+  hostWrite({status:"question",qi,q:{tag:q.tag,text:q.q,opts:q.opts},correct:null,fact:"",counts:null,answered:0,openedAt:Date.now()});
+  startHostTimer(H.room.dur*1000); SFX.pop();
+}
+function startHostTimer(ms){
+  clearInterval(H.timer); H.deadline=Date.now()+ms; H.lastTick=-1;
+  H.timer=setInterval(()=>{
+    const left=H.deadline-Date.now(), dur=H.room.dur*1000;
+    const f=$("hFill"), s=$("hSecs");
+    if(f){ f.style.transform=`scaleX(${Math.max(0,left)/dur})`; f.classList.toggle("low",left<=5000); }
+    if(s) s.textContent=Math.max(0,Math.ceil(left/1000))+"s";
+    const sec=Math.ceil(left/1000); if(left<=5000&&left>0&&sec!==H.lastTick){ H.lastTick=sec; SFX.tick(); }
+    if(left<=-GRACE_MS) closeQuestion();
+  },200);
+}
+function closeQuestion(){
+  if(!H.room||H.room.status!=="question") return;
+  clearInterval(H.timer);
+  const qi=H.room.qi, q=H.qs[qi], frozen={}; const counts=[0,0,0,0]; let ok=0;
+  for(const [pid,p] of Object.entries(H.players)) if(validAns(p,qi)){ const a=p.a["q"+qi]; frozen[pid]={c:a.c,t:a.t}; counts[a.c]++; if(a.c===q.ci) ok++; }
+  H.frozen["q"+qi]=frozen; keysWrite({frozen:{["q"+qi]:frozen}});
+  const n=Object.keys(frozen).length;
+  const {board,teamBoard}=computeBoard(qi);
+  const hard=[...(H.room.hard||[]).filter(h=>h.qi!==qi),{qi,short:q.short,pct:n?Math.round(100*ok/n):0,n}];
+  hostWrite({status:"reveal",correct:q.ci,fact:q.fact,counts,answered:n,okCount:ok,board,teamBoard,hard});
+  SFX.correct();
+  if(HOSTCFG.auto) H.auto=setTimeout(hostNext,12000);
+}
+function computeBoard(upto){
+  const res={};
+  for(const [pid,p] of Object.entries(H.players)) res[pid]={pid,n:String(p.n||"Player").slice(0,20),team:p.team||null,s:0,c:0,st:0,best:0,last:0,lastOk:false};
+  for(let qi=0;qi<=upto;qi++){
+    const fr=H.frozen["q"+qi]||{}, ci=H.qs[qi].ci, dur=H.room.dur*1000;
+    for(const r of Object.values(res)){
+      const a=fr[r.pid];
+      if(a&&a.c===ci){ r.st++; r.best=Math.max(r.best,r.st); r.c++;
+        const pts=Math.round((500+500*Math.max(0,1-a.t/dur))*(1+Math.min(0.5,0.1*(r.st-1))));
+        r.s+=pts; r.last=pts; r.lastOk=true; }
+      else { r.st=0; r.last=0; r.lastOk=false; r.ans=!!a; }
+      if(qi===upto) r.ans=!!a;
+    }
+  }
+  const board=Object.values(res).sort((a,b)=>b.s-a.s||b.c-a.c);
+  let teamBoard=[];
+  if(H.room.teams){
+    teamBoard=TEAMS.map(t=>{ const m=board.filter(r=>r.team===t.k); return {k:t.k,members:m.length,avg:m.length?Math.round(m.reduce((x,r)=>x+r.s,0)/m.length):0}; })
+      .filter(t=>t.members).sort((a,b)=>b.avg-a.avg);
+  }
+  return {board,teamBoard};
+}
+function hostNext(){
+  clearTimeout(H.auto); SFX.click();
+  if(H.room.status==="lobby"){ if(!Object.keys(H.players).length) return; return openQuestion(0); }
+  if(H.room.status==="reveal"){ return H.room.qi+1<H.room.total ? openQuestion(H.room.qi+1) : hostEnd(); }
+}
+function hostEnd(){
+  clearInterval(H.timer); clearTimeout(H.auto);
+  if(H.room.status==="question") closeQuestion();
+  const last=Math.max(0,H.room.qi); const {board,teamBoard}=H.room.qi>=0?computeBoard(last):{board:[],teamBoard:[]};
+  hostWrite({status:"end",board,teamBoard,endedAt:Date.now()});
+  SFX.fanfare(); setTimeout(confetti,2600);
+}
+function hostLeave(){
+  clearInterval(H.timer); clearInterval(H.poll); clearTimeout(H.auto); if(H.unsub) H.unsub(); H.unsub=null;
+  if(H.nr) H.nr.leave().catch(()=>{}); H.nr=null;
+  if(H.room&&H.room.status==="end") lsSet("nk_host",null);
+  if(L.mode==="p2p") p2pHostStop();
+  document.body.classList.remove("hosting"); H.room=null; openLiveMenu();
+}
+async function cleanupOldRooms(){
+  try{
+    const old=await L.db.collection("rooms").where("updatedAt","<",Date.now()-48*3600e3).limit(10).get();
+    for(const d of old.docs){
+      const code=d.id, dd=d.data()||{};
+      if(code===H.code||!(dd.updatedAt<Date.now()-48*3600e3)) continue;
+      const ps=await L.db.collection(`rooms/${code}/players`).limit(200).get();
+      for(const p of ps.docs){ await L.db.doc(`rooms/${code}/players/${p.id}`).delete().catch(()=>{}); }
+      await L.db.doc(`rooms/${code}/host/keys`).delete().catch(()=>{});
+      await L.db.doc("rooms/"+code).delete().catch(()=>{});
+    }
+  }catch(e){}
+}
+
+/* ---------- host rendering ---------- */
+const LINK_SET = /^https:\/\/claude\.ai\/artifact\/[A-Za-z0-9]+$/.test(ARTIFACT_URL);
+function joinLink(){ return L.mode==="p2p" ? location.href.split("#")[0]+"#join-"+H.code : LINK_SET ? `${ARTIFACT_URL}#join-${H.code}` : ""; }
+function renderHostPlayersOnly(){
+  if(!H.room) return;
+  if(H.room.status==="lobby"){ const el=$("hPlayers"); if(el){ el.innerHTML=playerChips(); $("hCount").textContent=Object.keys(H.players).length; $("hStart").disabled=!Object.keys(H.players).length; } return; }
+}
+function playerChips(){
+  const ps=Object.entries(H.players);
+  if(!ps.length) return `<div class="empty">Waiting for players to join…</div>`;
+  return ps.map(([pid,p])=>{ const t=teamOf(p.team); const on=!H.online||!H.online.size||H.online.has(pid);
+    return `<span class="pchip ${on?"":"off"}">${t?t.e+" ":""}${esc(String(p.n||"Player").slice(0,20))}</span>`; }).join("");
+}
+function optTiles(r,showCounts){
+  const tot=Math.max(1,(r.counts||[]).reduce((a,b)=>a+b,0));
+  return `<div class="tiles">${r.q.opts.map((o,i)=>{
+    const st = r.correct==null ? "" : i===r.correct ? "right" : "dim";
+    const cnt = showCounts&&r.counts ? `<span class="cnt">${r.counts[i]}</span><span class="bar" style="width:${100*r.counts[i]/tot}%"></span>` : "";
+    return `<div class="tile t${i} ${st}"><span class="shape">${r.correct===i?"✓":SHAPES[i]}</span><span class="otext">${esc(o)}</span>${cnt}</div>`;}).join("")}</div>`;
+}
+function boardHtml(board,teamBoard,limit=5,big=false){
+  const rows=board.slice(0,limit).map((r,i)=>{ const t=teamOf(r.team);
+    return `<div class="brow ${big?"big":""}"><span class="rk">${i+1}</span><span class="bn">${t?t.e+" ":""}${esc(r.n)}</span>${r.lastOk&&r.last?`<span class="gain">+${r.last}</span>`:""}<span class="bs">${r.s.toLocaleString()}</span></div>`; }).join("");
+  const teams=(teamBoard||[]).length?`<div class="tboard">${teamBoard.map((t,i)=>{const T=teamOf(t.k);return `<div class="trow"><span>${i===0?"🏆 ":""}${T.e} ${T.n} <small>(${t.members})</small></span><b>${t.avg.toLocaleString()}</b></div>`}).join("")}<div class="tnote">Team score = average per member</div></div>`:"";
+  return (rows||`<div class="empty">No scores yet</div>`)+teams;
+}
+function renderHost(){
+  const r=H.room, v=$("hostView"); if(!r||!v) return;
+  const head=`<div class="hhead"><div><span class="hcode">Room <b>${esc(r.code)}</b></span> <span class="net ok" id="hNet">● Live</span></div>
+    <div class="hbtns">${r.status!=="end"?`<label class="auto"><input type="checkbox" id="hAuto" ${HOSTCFG.auto?"checked":""}> Auto-advance</label><button class="iconbtn" id="hEnd">End game</button>`:""}<button class="iconbtn" id="hLeave">✕ Close</button></div></div>`;
+  let body="";
+  if(r.status==="lobby"){
+    body=`<div class="lobby">
+      <div class="joinbox"><div class="label">Join on your phone</div><div class="bigcode">${esc(r.code)}</div>
+        ${joinLink()?`<div id="qr" class="qr"></div>`:""}<div class="jl">Open the game link → <b>Live multiplayer</b> → enter the code${joinLink()?`<br><span class="mono">${esc(joinLink())}</span>`:""}</div>
+        ${joinLink()?`<button class="iconbtn" id="hCopy">📋 Copy join link</button>`:""}</div>
+      <div class="lobbyside"><h3>${esc(r.topicLabel)} · ${r.total} questions · ${r.dur}s each${r.teams?" · Teams":""}</h3>
+        <div class="label" style="text-align:left">Players (<span id="hCount">${Object.keys(H.players).length}</span>)</div>
+        <div id="hPlayers" class="pchips">${playerChips()}</div>
+        <button class="big" id="hStart" ${Object.keys(H.players).length?"":"disabled"}>Start the game 🍻</button></div></div>`;
+  } else if(r.status==="question"){
+    body=`<div class="hq"><div class="hqtop"><span class="tag">${esc(r.q.tag)}</span><span class="qn">Question ${r.qi+1} / ${r.total}</span></div>
+      <div class="timerwrap big"><div class="timerbar" id="hFill"></div></div>
+      <div class="hqrow"><span class="secs" id="hSecs">${r.dur}s</span><span id="hAnswered" class="answered">0 / ${Object.keys(H.players).length} answered</span></div>
+      <div class="hqtext">${rich(r.q.text)}</div>${optTiles(r,false)}
+      <div class="hctl"><button class="iconbtn" id="hReveal">Reveal now ⏭</button></div></div>`;
+  } else if(r.status==="reveal"){
+    const pct=r.answered?Math.round(100*r.okCount/r.answered):0;
+    body=`<div class="hq"><div class="hqtop"><span class="tag">${esc(r.q.tag)}</span><span class="qn">Question ${r.qi+1} / ${r.total} · ${pct}% correct (${r.okCount}/${r.answered})</span></div>
+      <div class="hqtext">${rich(r.q.text)}</div>${optTiles(r,true)}
+      <div class="revgrid"><div class="fact">${rich(r.fact)}</div><div class="minib"><div class="label" style="text-align:left">Leaderboard</div>${boardHtml(r.board,r.teamBoard)}</div></div>
+      <button class="big" id="hNext">${r.qi+1<r.total?"Next question →":"Final results 🏆"}</button></div>`;
+  } else if(r.status==="end"){
+    const b=r.board||[], pod=[b[1],b[0],b[2]];
+    const hard=[...(r.hard||[])].sort((a,b)=>a.pct-b.pct).slice(0,6);
+    body=`<div class="endh"><h2>Final results</h2>
+      <div class="podium">${pod.map((p,i)=>p?`<div class="pod p${[2,1,3][i]}" style="animation-delay:${[0.8,1.6,0][i]}s"><div class="pn">${esc(p.n)}</div><div class="ps">${p.s.toLocaleString()}</div><div class="pb">${["🥈","🥇","🥉"][i]}</div></div>`:"<div></div>").join("")}</div>
+      <div class="revgrid"><div class="minib"><div class="label" style="text-align:left">Full ranking</div>${boardHtml(b,r.teamBoard,100)}</div>
+      <div class="minib"><div class="label" style="text-align:left">Trainer view: hardest for this group</div>${hard.length?hard.map(h=>`<div class="hrow"><span>${esc(h.short)}</span><b class="${h.pct<50?"lo":""}">${h.pct}%</b></div>`).join(""):`<div class="empty">No questions answered</div>`}</div></div>
+      <div class="coverbtns"><button class="iconbtn" id="hCsv">📋 Copy results (CSV)</button><button class="iconbtn" id="hNew">↺ New game</button></div><div id="csvOut"></div></div>`;
+  }
+  v.innerHTML=head+body;
+  const on=(id,fn)=>{ const e=$(id); if(e) e.onclick=fn; };
+  on("hLeave",hostLeave); on("hEnd",()=>{ if(confirmTap("hEnd","Tap again to end")) hostEnd(); });
+  on("hStart",hostNext); on("hNext",hostNext); on("hReveal",closeQuestion); on("hNew",()=>{ lsSet("nk_host",null); hostLeave(); });
+  on("hCopy",()=>copyText(joinLink(),"hCopy")); on("hCsv",()=>copyText(resultsCsv(),"hCsv"));
+  const a=$("hAuto"); if(a) a.onchange=()=>{ HOSTCFG.auto=a.checked; lsSet("nk_hostcfg",HOSTCFG); if(!a.checked) clearTimeout(H.auto); else if(H.room.status==="reveal") H.auto=setTimeout(hostNext,8000); };
+  if(r.status==="lobby"&&joinLink()) drawQR();
+  if(r.status==="question"){ const el=$("hAnswered"); if(el) el.textContent=`${Object.keys(H.players).filter(p=>validAns(H.players[p],r.qi)).length} / ${Object.keys(H.players).length} answered`; }
+}
+const armed={};
+function confirmTap(id,label){ if(armed[id]) { armed[id]=false; return true; } armed[id]=true; const b=$(id), old=b.textContent; b.textContent=label; setTimeout(()=>{ armed[id]=false; if($(id)) $(id).textContent=old; },3000); return false; }
+function copyText(t,btnId){
+  const b=$(btnId), old=b.textContent;
+  const fallback=()=>{ const o=$("csvOut")||b.parentElement; const ta=document.createElement("textarea"); ta.className="search"; ta.rows=6; ta.value=t; o.appendChild(ta); ta.select(); };
+  try{ navigator.clipboard.writeText(t).then(()=>{ b.textContent="✓ Copied"; setTimeout(()=>b.textContent=old,1800); },fallback); }catch(e){ fallback(); }
+}
+function resultsCsv(){
+  const r=H.room, q=s=>`"${String(s).replace(/"/g,'""')}"`;
+  const rows=[["Rank","Name","Team","Score","Correct","Questions"].join(",")];
+  (r.board||[]).forEach((p,i)=>rows.push([i+1,q(p.n),q(p.team?teamOf(p.team).n:""),p.s,p.c,r.total].join(",")));
+  rows.push("",["Question","Standard / answer","% correct","Answered"].join(","));
+  [...(r.hard||[])].sort((a,b)=>a.qi-b.qi).forEach(h=>rows.push([h.qi+1,q(h.short),h.pct,h.n].join(",")));
+  return rows.join("\n");
+}
+let qrLoading=null;
+function drawQR(){
+  const el=$("qr"); if(!el) return;
+  const go=()=>{ try{ el.innerHTML=""; new QRCode(el,{text:joinLink(),width:170,height:170,colorDark:"#1a0f06",colorLight:"#fff6e3"}); }catch(e){ el.style.display="none"; } };
+  if(window.QRCode) return go();
+  if(!qrLoading){ qrLoading=new Promise((res,rej)=>{ const s=document.createElement("script"); s.src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+  qrLoading.then(go,()=>{ el.style.display="none"; });
+}
+
+/* ================================================================
+   PLAYER
+   ================================================================ */
+const P={code:null,name:"",ref:null,room:null,me:null,unsub:null,poll:null,lastSeq:0,qiShown:-1,qStart:0,picks:{},timer:null,nr:null,chain:Promise.resolve(),fetching:false,lastStatus:null};
+async function joinGame(codeIn,nameIn){
+  liveMsg(""); ac();
+  const code=String(codeIn||"").toUpperCase().replace(/[^A-Z]/g,""), name=String(nameIn||"").trim().slice(0,20);
+  if(code.length!==4) return liveMsg("Enter the 4-letter room code shown on the trainer's screen.");
+  if(!name) return liveMsg("Enter your name or a nickname.");
+  const btn=$("joinBtn"); btn.disabled=true; btn.textContent="Joining…";
+  try{
+    if(L.mode==="p2p"){ L.db=await p2pConnect(code); NET.remote.onStatus(ok=>{ playerNet(ok); if(ok) refreshRoom(); }); }
+    const rs=await retry(()=>L.db.doc("rooms/"+code).get());
+    const d=rs.exists?rs.data():null;
+    if(!d||!d.status) throw {msg:"No game found with code "+code+". Check the code on the trainer's screen."};
+    if(d.status==="end") throw {msg:"That game has already finished."};
+    P.code=code; P.name=name; P.ref=L.db.doc(`rooms/${code}/players/${L.pid}`);
+    const mine=await retry(()=>P.ref.get());
+    if(mine.exists){ P.me=mine.data(); await retry(()=>P.ref.update({n:name,seen:Date.now()})); }
+    else { P.me={n:name,team:null,joinedAt:Date.now(),seen:Date.now(),a:{}}; await retry(()=>P.ref.set(P.me)); }
+    P.picks={}; Object.entries(P.me.a||{}).forEach(([k,v])=>{ P.picks[+k.slice(1)]=v.c; });
+    P.lastSeq=0; P.qiShown=-1; P.room=null; P.lastStatus=null;
+    lsSet("nk_player",{code,name});
+    show("player"); applyRoom(d);
+    if(P.unsub) P.unsub();
+    P.unsub=L.db.doc("rooms/"+code).onSnapshot(s=>{ if(s.exists) applyRoom(s.data()); },()=>{});
+    clearInterval(P.poll); P.poll=setInterval(refreshRoom,4000);
+    P.nr=await joinNamedRoom(code,{role:"player",pid:L.pid},m=>{ if(!m.seq||m.seq>P.lastSeq) refreshRoom(); });
+    if(P.nr) nudge(P.nr,{joined:1});
+  }catch(e){ liveMsg(e&&e.msg?e.msg:friendlyErr(e)); }
+  btn.disabled=false; btn.textContent="Join 📱";
+}
+function refreshRoom(){
+  if(!P.code||P.fetching) return; P.fetching=true;
+  L.db.doc("rooms/"+P.code).get().then(s=>{ if(s.exists) applyRoom(s.data()); playerNet(true); }).catch(()=>playerNet(false)).finally(()=>P.fetching=false);
+}
+function playerNet(ok){ const el=$("pNet"); if(el){ el.textContent=ok?"● Live":"⚠ Reconnecting…"; el.className="net "+(ok?"ok":"bad"); } }
+function applyRoom(d){
+  if(!d||typeof d!=="object") return;
+  if(P.room&&(d.seq||0)<=P.lastSeq) return;
+  P.lastSeq=d.seq||0; const prev=P.lastStatus; P.room=d; P.lastStatus=d.status;
+  if(d.status==="question"&&d.qi!==P.qiShown){ P.qiShown=d.qi; P.qStart=performance.now(); startPlayerTimer(); SFX.pop(); }
+  if(d.status!=="question") clearInterval(P.timer);
+  if(d.status==="reveal"&&prev!=="reveal"){ const me=myRow(); (me&&me.lastOk)?SFX.correct():SFX.wrong(); }
+  if(d.status==="end"&&prev!=="end"){ const i=(d.board||[]).findIndex(r=>r.pid===L.pid); if(i>=0&&i<3){ SFX.fanfare(); confetti(); } else SFX.pour(); lsSet("nk_player",null); }
+  renderPlayer();
+}
+function myRow(){ return (P.room&&P.room.board||[]).find(r=>r.pid===L.pid); }
+function startPlayerTimer(){
+  clearInterval(P.timer); let lastTick=-1;
+  P.timer=setInterval(()=>{
+    const dur=P.room.dur*1000, left=dur-(performance.now()-P.qStart);
+    const f=$("pFill"), s=$("pSecs");
+    if(f){ f.style.transform=`scaleX(${Math.max(0,left)/dur})`; f.classList.toggle("low",left<=5000); }
+    if(s) s.textContent=Math.max(0,Math.ceil(left/1000))+"s";
+    const sec=Math.ceil(left/1000); if(left<=5000&&left>0&&sec!==lastTick&&P.picks[P.room.qi]==null){ lastTick=sec; SFX.tick(); }
+    if(left<=0){ clearInterval(P.timer); renderPlayer(); }
+  },200);
+}
+function pick(i){
+  const r=P.room; if(!r||r.status!=="question") return;
+  const qi=r.qi; if(P.picks[qi]!=null) return;
+  const t=Math.round(performance.now()-P.qStart); if(t>r.dur*1000+GRACE_MS) return;
+  P.picks[qi]=i; SFX.click(); renderPlayer();
+  P.chain=P.chain.then(()=>retry(()=>P.ref.update({a:{["q"+qi]:{c:i,t}},seen:Date.now()})))
+    .then(()=>{ nudge(P.nr,{a:qi}); playerNet(true); })
+    .catch(e=>{ playerNet(false); const el=$("pWarn"); if(el) el.textContent="Your answer didn't send: "+friendlyErr(e); });
+}
+function setTeam(k){
+  if(!P.ref) return; P.me.team=k; SFX.click(); renderPlayer();
+  P.chain=P.chain.then(()=>retry(()=>P.ref.update({team:k}))).then(()=>nudge(P.nr,{team:1})).catch(()=>{});
+}
+function playerLeave(){
+  clearInterval(P.timer); clearInterval(P.poll); if(P.unsub) P.unsub(); P.unsub=null;
+  if(P.nr) P.nr.leave().catch(()=>{}); P.nr=null; P.code=null; lsSet("nk_player",null);
+  if(L.mode==="p2p"&&NET.remote){ NET.remote.close(); NET.remote=null; }
+  openLiveMenu();
+}
+function renderPlayer(){
+  const r=P.room, v=$("playerView"); if(!r||!v) return;
+  const head=`<div class="hhead"><span class="hcode">${esc(P.name)} · Room <b>${esc(r.code)}</b></span><span class="net ok" id="pNet">● Live</span></div>`;
+  let body="";
+  const me=myRow(), rank=(r.board||[]).findIndex(x=>x.pid===L.pid);
+  if(r.status==="lobby"){
+    body=`<div class="pcard center"><div class="bigemoji">🍺</div><h2>You're in!</h2><p class="sub">Waiting for the trainer to start…<br>${esc(r.topicLabel)} · ${r.total} questions · ${r.dur}s each</p>
+      ${r.teams?`<div class="label">Pick your team</div><div class="teams">${TEAMS.map(t=>`<button class="team ${P.me.team===t.k?"sel":""}" data-k="${t.k}">${t.e}<br>${t.n}</button>`).join("")}</div>`:""}</div>`;
+  } else if(r.status==="question"){
+    const mine=P.picks[r.qi], dur=r.dur*1000, over=performance.now()-P.qStart>dur;
+    body=`<div class="timerwrap"><div class="timerbar" id="pFill"></div></div>
+      <div class="timerrow"><span class="qnum">Question ${r.qi+1} / ${r.total}</span><span class="secs" id="pSecs">${r.dur}s</span></div>
+      <div class="qcard"><div class="tag">${esc(r.q.tag)}</div><div class="qtext">${rich(r.q.text)}</div>
+      <div class="answers">${r.q.opts.map((o,i)=>`<button class="ans popt t${i} ${mine===i?"picked":mine!=null?"gone":""}" data-i="${i}" ${mine!=null||over?"disabled":""}><span class="k">${SHAPES[i]}</span><span>${esc(o)}</span></button>`).join("")}</div>
+      <div class="lock">${mine!=null?"🔒 Locked in. Waiting for the others…":over?"⏰ Time's up":""}</div><div id="pWarn" class="warn"></div></div>`;
+  } else if(r.status==="reveal"){
+    const mine=P.picks[r.qi], ok=me&&me.lastOk;
+    body=`<div class="pcard ${ok?"ok":"no"}"><h2>${ok?"Correct! 👃":mine==null?"No answer ⏰":"Not this time 😬"}</h2>
+      ${ok?`<div class="gainbig">+${me.last}</div>`:""}
+      <p class="sub">Answer: <b>${SHAPES[r.correct]} ${esc(r.q.opts[r.correct])}</b></p>
+      ${me?`<div class="pstats"><div><b>${me.s.toLocaleString()}</b><span>Score</span></div><div><b>${rank+1}<small>/${r.board.length}</small></b><span>Rank</span></div><div><b>${me.st}🔥</b><span>Streak</span></div></div>`:""}
+      <div class="fact">${rich(r.fact)}</div></div>`;
+  } else if(r.status==="end"){
+    const t=me&&me.team?teamOf(me.team):null, tr=t?(r.teamBoard||[]).findIndex(x=>x.k===t.k):-1;
+    body=`<div class="pcard center"><div class="bigemoji">${rank===0?"🥇":rank===1?"🥈":rank===2?"🥉":"🍻"}</div><h2>${rank>=0?`You finished #${rank+1} of ${r.board.length}`:"Game over"}</h2>
+      ${me?`<div class="pstats"><div><b>${me.s.toLocaleString()}</b><span>Score</span></div><div><b>${me.c}/${r.total}</b><span>Correct</span></div><div><b>${me.best}</b><span>Best streak</span></div></div>`:""}
+      ${t&&tr>=0?`<p class="sub">Team ${t.e} ${t.n} finished #${tr+1}</p>`:""}
+      <div class="minib">${boardHtml(r.board,r.teamBoard,5)}</div>
+      <button class="big" id="pDone">Back to menu</button></div>`;
+  }
+  v.innerHTML=head+body+(r.status!=="end"?`<div class="coverbtns"><button class="iconbtn" id="pLeave">Leave game</button></div>`:"");
+  v.querySelectorAll(".popt").forEach(b=>b.onclick=()=>pick(+b.dataset.i));
+  v.querySelectorAll(".team").forEach(b=>b.onclick=()=>setTeam(b.dataset.k));
+  const lv=$("pLeave"); if(lv) lv.onclick=()=>{ if(confirmTap("pLeave","Tap again to leave")) playerLeave(); };
+  const dn=$("pDone"); if(dn) dn.onclick=()=>{ playerLeave(); show("start"); };
+}
+document.addEventListener("keydown",e=>{
+  if(!$("player").classList.contains("active")||!P.room||P.room.status!=="question") return;
+  const k="abcd".indexOf(e.key.toLowerCase()); if(k>=0) pick(k);
+});
+
+/* ---------- wiring ---------- */
+$("liveBtn").onclick=()=>{ SFX.click(); openLiveMenu(); };
+$("liveBack").onclick=()=>{ SFX.click(); show("start"); };
+$("hostBtn").onclick=hostCreate;
+$("joinBtn").onclick=()=>joinGame($("joinCode").value,$("joinName").value);
+$("joinCode").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,4); });
+["joinCode","joinName"].forEach(id=>$(id).addEventListener("keydown",e=>{ if(e.key==="Enter") $("joinBtn").click(); }));
+
+</script>
+</body>
+</html>
