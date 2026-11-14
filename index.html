@@ -823,13 +823,130 @@ document.addEventListener("keydown",e=>{
    NO-ACCOUNT MODE (peer-to-peer)
    When the page is opened from a normal web address (not inside Claude),
    the host's browser *is* the server: it keeps the game data in memory and
-   players' browsers connect straight to it with WebRTC via PeerJS.
+   players' browsers reach it through public MQTT relays (see RelayPeer below),
+   which works across different networks, including mobile data.
    Same game logic as Claude mode: it talks to a small db look-alike.
    ================================================================ */
 const PEER_PREFIX="nose-knows-core32-v1-";
-const PEERJS_SRC=["https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js","https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js","https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"];
+/* Relay transport: the same calls the game made on PeerJS, carried over public MQTT
+   brokers (secure WebSockets). Every message is sent through every broker that is
+   connected and de-duplicated on arrival, so one broker being down or blocked does
+   not stop the game. No accounts; works on mobile data and most Wi-Fi. */
+const MQTT_SRC=["https://cdn.jsdelivr.net/npm/mqtt@5.16.1/dist/mqtt.min.js","https://unpkg.com/mqtt@5.16.1/dist/mqtt.min.js"];
+const BROKERS=[{url:"wss://public.cloud.shiftr.io:443/mqtt",username:"public",password:"public"},{url:"wss://broker.emqx.io:8084/mqtt"},{url:"wss://broker.hivemq.com:8884/mqtt"}];
+const RELAY_ROOT="nk-relay-v1/";
+const rid=(n=12)=>{ const a="abcdefghijklmnopqrstuvwxyz0123456789"; let s=""; const r=(window.crypto&&crypto.getRandomValues)?crypto.getRandomValues(new Uint8Array(n)):null; for(let i=0;i<n;i++) s+=a[(r?r[i]:Math.floor(Math.random()*256))%a.length]; return s; };
+class RelayEmitter{
+  constructor(){ this._h={}; }
+  on(e,f){ (this._h[e]=this._h[e]||new Set()).add(f); return this; }
+  off(e,f){ if(this._h[e]) this._h[e].delete(f); return this; }
+  emit(e,...a){ [...(this._h[e]||[])].forEach(f=>{ try{ f(...a); }catch(x){ console.error(x); } }); }
+}
+class RelayConn extends RelayEmitter{
+  constructor(peer,remote,cid){ super(); this._peer=peer; this.remote=remote; this.cid=cid; this.open=false; this.lastSeen=Date.now(); }
+  send(obj){ if(!this.open) throw new Error("closed"); this._peer._pub(this.remote,{t:"d",cid:this.cid,d:obj}); }
+  close(){ if(this._dropped) return; try{ this._peer._pub(this.remote,{t:"x",cid:this.cid}); }catch(e){} this._drop(); }
+  _drop(){ if(this._dropped) return; this._dropped=true; this.open=false; this._peer.conns.delete(this.cid); clearInterval(this._retry); this.emit("close"); }
+}
+class RelayPeer extends RelayEmitter{
+  constructor(id){
+    super();
+    this.claim=typeof id==="string"; this.id=this.claim?id:"p-"+rid(14);
+    this.destroyed=false; this.conns=new Map(); this.clients=[]; this.nonce=rid(10);
+    this._seen=new Set(); this._seenQ=[]; this._open=false; this._taken=false;
+    setTimeout(()=>this._start(),0);
+  }
+  get disconnected(){ return !this.clients.some(c=>c.connected); }
+  _topic(id){ return RELAY_ROOT+id; }
+  _start(){
+    let first=true;
+    const failT=setTimeout(()=>{ if(first&&!this.destroyed) this.emit("error",{type:"network"}); },12000);
+    for(const b of BROKERS){
+      let c; try{ c=mqtt.connect(b.url,{clientId:"nk_"+rid(14),clean:true,connectTimeout:8000,reconnectPeriod:3000,keepalive:30,...(b.username?{username:b.username,password:b.password}:{})}); }catch(e){ continue; }
+      this.clients.push(c);
+      c.on("connect",()=>{
+        c.subscribe(this._topic(this.id),{qos:0},()=>{ if(first&&!this.destroyed){ first=false; clearTimeout(failT); this._ready(); } });
+      });
+      c.on("message",(t,buf)=>{ let m; try{ m=JSON.parse(buf.toString()); }catch(e){ return; } this._recv(m); });
+      c.on("error",()=>{});
+    }
+    if(!this.clients.length){ clearTimeout(failT); setTimeout(()=>this.emit("error",{type:"network"})); }
+    this._hb=setInterval(()=>this._beat(),5000);
+  }
+  _ready(){
+    if(!this.claim){ this._open=true; this.emit("open",this.id); return; }
+    // a host claims its room id: ask whether anyone already holds it
+    try{ this._pub(this.id,{t:"probe",n:this.nonce}); }catch(e){}
+    setTimeout(()=>{
+      if(this.destroyed) return;
+      if(this._taken){ this.emit("error",{type:"unavailable-id"}); this.destroy(); return; }
+      this._open=true; this.emit("open",this.id);
+    },1800);
+  }
+  _pub(target,msg){
+    const live=this.clients.filter(c=>c.connected);
+    if(!live.length) throw new Error("offline");
+    msg.from=this.id; msg.mid=rid(12);
+    const s=JSON.stringify(msg), t=this._topic(target);
+    live.forEach(c=>{ try{ c.publish(t,s,{qos:0}); }catch(e){} });
+  }
+  _dup(mid){
+    if(!mid) return false; if(this._seen.has(mid)) return true;
+    this._seen.add(mid); this._seenQ.push(mid); if(this._seenQ.length>4000) this._seen.delete(this._seenQ.shift());
+    return false;
+  }
+  _recv(m){
+    if(!m||typeof m!=="object"||this.destroyed||this._dup(m.mid)) return;
+    const c=m.cid&&this.conns.get(m.cid);
+    switch(m.t){
+      case "probe": if(m.n===this.nonce) return; if(this.claim&&this._open) try{ this._pub(this.id,{t:"taken",n:m.n}); }catch(e){} return;
+      case "taken": if(m.n===this.nonce) this._taken=true; return;
+      case "open": {
+        if(!this._open||typeof m.from!=="string"||typeof m.cid!=="string") return;
+        if(c){ try{ this._pub(m.from,{t:"ack",cid:m.cid}); }catch(e){} return; }
+        const conn=new RelayConn(this,m.from,m.cid); this.conns.set(m.cid,conn);
+        this.emit("connection",conn);
+        conn.open=true; try{ this._pub(m.from,{t:"ack",cid:m.cid}); }catch(e){}
+        setTimeout(()=>conn.emit("open"));
+        return;
+      }
+      case "ack": if(c&&!c.open&&c.remote===m.from){ c.open=true; c.lastSeen=Date.now(); clearInterval(c._retry); c.emit("open"); } return;
+      case "d":
+        if(c&&c.remote===m.from){ c.lastSeen=Date.now(); if(c.open) c.emit("data",m.d); }
+        else if(this.claim&&m.from) try{ this._pub(m.from,{t:"x",cid:m.cid}); }catch(e){}   // unknown link: tell the player to reconnect
+        return;
+      case "hb": if(c&&c.remote===m.from) c.lastSeen=Date.now(); return;
+      case "x": if(c&&c.remote===m.from) c._drop(); return;
+    }
+  }
+  _beat(){
+    const now=Date.now();
+    for(const c of [...this.conns.values()]){
+      if(!c.open) continue;
+      if(now-c.lastSeen>17000){ c._drop(); continue; }
+      try{ this._pub(c.remote,{t:"hb",cid:c.cid}); }catch(e){}
+    }
+  }
+  connect(target){
+    const cid=rid(14), conn=new RelayConn(this,target,cid); this.conns.set(cid,conn);
+    const ask=()=>{ try{ this._pub(target,{t:"open",cid}); }catch(e){} };
+    ask(); conn._retry=setInterval(()=>{ if(conn.open||conn._dropped) return clearInterval(conn._retry); ask(); },1500);
+    setTimeout(()=>{ if(!conn.open&&!conn._dropped){ clearInterval(conn._retry); this.conns.delete(cid); this.emit("error",{type:"peer-unavailable"}); } },7000);
+    return conn;
+  }
+  reconnect(){ this.clients.forEach(c=>{ if(!c.connected) try{ c.reconnect(); }catch(e){} }); }
+  destroy(){
+    if(this.destroyed) return; this.destroyed=true; clearInterval(this._hb);
+    [...this.conns.values()].forEach(c=>c.close());
+    this.clients.forEach(c=>{ try{ c.end(true); }catch(e){} });
+  }
+}
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
-async function loadPeerJs(){ if(window.Peer) return true; for(const s of PEERJS_SRC){ try{ await loadScript(s); if(window.Peer) return true; }catch(e){} } return false; }
+async function loadPeerJs(){
+  if(!window.mqtt){ for(const s of MQTT_SRC){ try{ await loadScript(s); if(window.mqtt) break; }catch(e){} } }
+  if(!window.mqtt) return false;
+  window.Peer=RelayPeer; return true;
+}
 const jclone=v=>v===undefined?undefined:JSON.parse(JSON.stringify(v));
 function deepMerge(a,b){ for(const [k,v] of Object.entries(b)){ if(v&&typeof v==="object"&&!Array.isArray(v)&&a[k]&&typeof a[k]==="object"&&!Array.isArray(a[k])) deepMerge(a[k],v); else a[k]=v; } return a; }
 const colOf=p=>p.split("/").slice(0,-1).join("/");
@@ -861,8 +978,9 @@ function peerOnce(id){
   return new Promise((res,rej)=>{
     let p; try{ p=id?new Peer(id,{debug:0}):new Peer({debug:0}); }catch(e){ return rej({type:"init"}); }
     const t=setTimeout(()=>{ try{p.destroy()}catch(e){} rej({type:"timeout"}); },12000);
-    p.on("open",()=>{ clearTimeout(t); res(p); });
-    p.on("error",e=>{ clearTimeout(t); try{p.destroy()}catch(x){} rej({type:e&&e.type||"error"}); });
+    const onErr=e=>{ clearTimeout(t); try{p.destroy()}catch(x){} rej({type:e&&e.type||"error"}); };
+    p.on("open",()=>{ clearTimeout(t); p.off("error",onErr); res(p); });   // later link errors must not tear down the peer
+    p.on("error",onErr);
   });
 }
 
