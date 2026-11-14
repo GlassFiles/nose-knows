@@ -189,7 +189,11 @@
   .tile.dim{opacity:.35;filter:saturate(.4)}
   .tile.right{outline:4px solid var(--foam);transform:scale(1.02)}
   .tile.pickable{cursor:pointer} .tile.pickable:active{transform:scale(.98)} .tile.mine{outline:4px solid #fff}
-  .hmine{margin-top:10px;color:var(--muted);font-size:14px;text-align:center} .auto input{width:20px;height:20px}
+  .hmine{margin-top:10px;color:var(--muted);font-size:14px;text-align:center} .auto select{background:#1d140e;color:inherit;border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 6px;font:inherit}
+  .namerow{display:flex;gap:8px;align-items:center;margin-bottom:10px} .namerow .search{flex:1;margin:0} .namerow .iconbtn{font-size:20px;padding:8px 12px}
+  .avatars{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 14px} .av{font-size:22px;width:42px;height:42px;border-radius:12px;border:1.5px solid var(--line);background:rgba(0,0,0,.25);cursor:pointer;line-height:1}
+  .av.sel{border-color:rgba(242,165,22,.95);background:rgba(242,165,22,.22);transform:scale(1.08)} .hjoinrow .avbtn{font-size:22px;padding:6px 10px}
+  .hjoin{margin-top:12px} .hjoinrow{display:flex;gap:8px} .hjoinrow .search{flex:1;margin:0}
   .hctl{display:flex;justify-content:flex-end;margin-top:12px}
   .revgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:16px}
   .fact{background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--muted);line-height:1.5;font-size:15px}
@@ -303,7 +307,8 @@
     <div class="panel">
       <h3>📱 Join a game</h3>
       <input id="joinCode" class="search code" maxlength="4" placeholder="ROOM CODE" autocomplete="off" autocapitalize="characters" aria-label="Room code">
-      <input id="joinName" class="search" maxlength="20" placeholder="Your name or nickname" autocomplete="nickname" aria-label="Your name">
+      <div class="namerow"><input id="joinName" class="search" maxlength="20" placeholder="Your name or nickname" autocomplete="nickname" aria-label="Your name"><button class="iconbtn" id="rollName" title="Give me a random name" aria-label="Random name">🎲</button></div>
+      <div class="label">Your badge</div><div class="avatars" id="joinAv"></div>
       <button class="big" id="joinBtn">Join 📱</button>
     </div>
     <div class="panel">
@@ -312,6 +317,7 @@
       <div class="label">Questions</div><div class="topics" id="hostCount"></div>
       <div class="label">Seconds per question</div><div class="topics" id="hostSecs"></div>
       <div class="label">Mode</div><div class="topics" id="hostTeams"></div>
+      <div class="label">Auto-advance after each answer</div><div class="topics" id="hostAuto"></div>
       <div class="label">Play along (optional)</div>
       <input id="hostName" class="search" maxlength="20" placeholder="Your name, to play on this screen too" autocomplete="nickname" aria-label="Your name, to play along on the host screen">
       <button class="big" id="hostBtn">Host on this screen 🖥️</button>
@@ -1105,11 +1111,21 @@ async function p2pConnect(code){
 const ARTIFACT_URL = "";
 const SHAPES=["▲","◆","●","■"];
 const TEAMS=[{k:"hops",n:"Hops",e:"🌿"},{k:"malt",n:"Malt",e:"🌾"},{k:"yeast",n:"Yeast",e:"🧫"},{k:"water",n:"Water",e:"💧"}];
+/* player names and badges: a random beer-flavoured default the player can change */
+const AVATARS=["🍺","🍻","🌾","🌿","🧫","💧","👃","👅","🍋","🍌","🍏","🍒","🍯","🌰","☕","🍫","🔥","🪵","🧪","🥨"];
+const NAME_A=["Hoppy","Malty","Hazy","Crisp","Toasty","Smoky","Zesty","Funky","Nutty","Biscuity","Fruity","Floral","Roasty","Golden","Juicy","Tart","Mellow","Spicy","Frothy","Bright"];
+const NAME_B=["Badger","Brewer","Cellarer","Firkin","Taster","Nose","Hophead","Masher","Barley","Cask","Pint","Stout","Porter","Lager","Saison","Bitter","Wort","Tankard"];
+const pickOne=a=>a[Math.floor(Math.random()*a.length)];
+function randName(){ return (pickOne(NAME_A)+" "+pickOne(NAME_B)).slice(0,20); }
+function avOf(x){ return AVATARS.includes(x)?x:""; }
+function renderAvPicker(id){ const el=$(id); if(!el) return; el.innerHTML=AVATARS.map(a=>`<button class="av ${a===MY_AV?"sel":""}" data-a="${a}" aria-label="Badge ${a}">${a}</button>`).join("");
+  el.querySelectorAll(".av").forEach(b=>b.onclick=()=>{ SFX.click(); MY_AV=b.dataset.a; lsSet("nk_me",{...(lsGet("nk_me",null)||{}),av:MY_AV}); renderAvPicker(id); }); }
 const GRACE_MS=2000;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rich=s=>esc(s).replace(/&lt;(\/?)(em|b|i)&gt;/g,"<$1$2>");   // only allow our own simple tags from shared data
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
 const lsSet=(k,v)=>{try{ v==null?localStorage.removeItem(k):localStorage.setItem(k,JSON.stringify(v)) }catch(e){}};
+const ME=lsGet("nk_me",null)||{}; let MY_AV=avOf(ME.av)||pickOne(AVATARS);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const teamOf=k=>TEAMS.find(t=>t.k===k);
 const L={db:null,user:null,room:null,uid:null,pid:null,state:"loading"};
@@ -1175,7 +1191,9 @@ function pushProgress(){
 /* ---------- live menu ---------- */
 const HOSTCFG=lsGet("nk_hostcfg",{topic:"core",n:15,secs:20,teams:false,auto:false});
 if(!TOPICS[HOSTCFG.topic]) HOSTCFG.topic="core";
-function openLiveMenu(){ show("liveMenu"); renderHostSetup(); renderLiveStatus(); renderResume(); const pl=lsGet("nk_player",null); if(pl&&!$("joinName").value) $("joinName").value=pl.name||""; }
+if(![5,10,15,20,30].includes(HOSTCFG.autoSecs)) HOSTCFG.autoSecs=10;
+const AUTO_CHOICES=[0,5,10,15,20,30];
+function openLiveMenu(){ show("liveMenu"); renderHostSetup(); renderLiveStatus(); renderResume(); const pl=lsGet("nk_player",null), me=lsGet("nk_me",null)||{}; if(!$("joinName").value) $("joinName").value=(pl&&pl.name)||me.name||randName(); renderAvPicker("joinAv"); }
 function renderLiveStatus(){
   const el=$("liveStatus"); if(!el) return;
   const can = L.state==="ready";
@@ -1195,6 +1213,7 @@ function renderHostSetup(){
   chipRow("hostCount",[[10,"10"],[15,"15"],[20,"20"],[32,"32"]],HOSTCFG.n,v=>{HOSTCFG.n=+v;renderHostSetup();});
   chipRow("hostSecs",[[10,"10s"],[15,"15s"],[20,"20s"],[30,"30s"],[45,"45s"]],HOSTCFG.secs,v=>{HOSTCFG.secs=+v;renderHostSetup();});
   chipRow("hostTeams",[["0","Individual"],["1","Teams 🌿🌾🧫💧"]],HOSTCFG.teams?"1":"0",v=>{HOSTCFG.teams=v==="1";renderHostSetup();});
+  chipRow("hostAuto",AUTO_CHOICES.map(v=>[v,v?v+"s":"Off"]),HOSTCFG.auto?HOSTCFG.autoSecs:0,v=>{ v=+v; HOSTCFG.auto=v>0; if(v) HOSTCFG.autoSecs=v; renderHostSetup(); });
   lsSet("nk_hostcfg",HOSTCFG);
 }
 async function renderResume(){
@@ -1258,7 +1277,7 @@ async function hostCreate(){
     await retry(()=>L.db.doc(`rooms/${code}/host/keys`).set({hostKey,qs,frozen:{},cfg,createdAt:Date.now()}));
     await retry(()=>L.db.doc("rooms/"+code).set(H.room));
     const me=($("hostName").value||"").trim().slice(0,20)||null; H.me=me; H.myPicks={};
-    if(me) await retry(()=>L.db.doc(`rooms/${code}/players/${L.pid}`).set({n:me,team:null,joinedAt:Date.now(),seen:Date.now(),a:{},host:true}));
+    if(me) await retry(()=>L.db.doc(`rooms/${code}/players/${L.pid}`).set({n:me,av:MY_AV,team:null,joinedAt:Date.now(),seen:Date.now(),a:{},host:true}));
     lsSet("nk_host",{code,hostKey,me});
     await startHost();
     if(L.mode==="claude") cleanupOldRooms();
@@ -1338,11 +1357,11 @@ function closeQuestion(){
   const hard=[...(H.room.hard||[]).filter(h=>h.qi!==qi),{qi,short:q.short,pct:n?Math.round(100*ok/n):0,n}];
   hostWrite({status:"reveal",correct:q.ci,fact:q.fact,counts,answered:n,okCount:ok,board,teamBoard,hard});
   SFX.correct();
-  if(HOSTCFG.auto) scheduleAuto(10000);
+  if(HOSTCFG.auto) scheduleAuto((HOSTCFG.autoSecs||10)*1000);
 }
 function computeBoard(upto){
   const res={};
-  for(const [pid,p] of Object.entries(H.players)) res[pid]={pid,n:String(p.n||"Player").slice(0,20),team:p.team||null,s:0,c:0,st:0,best:0,last:0,lastOk:false};
+  for(const [pid,p] of Object.entries(H.players)) res[pid]={pid,n:String(p.n||"Player").slice(0,20),av:avOf(p.av),team:p.team||null,s:0,c:0,st:0,best:0,last:0,lastOk:false};
   for(let qi=0;qi<=upto;qi++){
     const fr=H.frozen["q"+qi]||{}, ci=H.qs[qi].ci, dur=H.room.dur*1000;
     for(const r of Object.values(res)){
@@ -1376,6 +1395,14 @@ function hostPick(i){
   const t=Date.now()-(r.openedAt||Date.now()); if(t>r.dur*1000+GRACE_MS) return;
   H.myPicks[qi]=i; SFX.click(); renderHost();
   retry(()=>L.db.doc(`rooms/${H.code}/players/${L.pid}`).update({a:{["q"+qi]:{c:i,t}},seen:Date.now()})).catch(()=>{});
+}
+async function hostJoin(name){
+  name=String(name||"").trim().slice(0,20); if(!name){ const el=$("hJoinName"); if(el) el.focus(); return; }
+  if(!H.room||H.room.status!=="lobby"||H.me) return;
+  H.me=name; H.myPicks={}; SFX.click();
+  const h=lsGet("nk_host",null); if(h&&h.code===H.code) lsSet("nk_host",{...h,me:name});
+  H.players[L.pid]={n:name,av:MY_AV,team:null,a:{},host:true}; renderHost();
+  retry(()=>L.db.doc(`rooms/${H.code}/players/${L.pid}`).set({n:name,av:MY_AV,team:null,joinedAt:Date.now(),seen:Date.now(),a:{},host:true})).catch(()=>{});
 }
 function hostSetTeam(k){ if(!H.me||!H.code) return; SFX.click(); if(H.players[L.pid]) H.players[L.pid].team=k; renderHost(); retry(()=>L.db.doc(`rooms/${H.code}/players/${L.pid}`).update({team:k})).catch(()=>{}); }
 function hostNext(){
@@ -1422,7 +1449,7 @@ function playerChips(){
   const ps=Object.entries(H.players);
   if(!ps.length) return `<div class="empty">Waiting for players to join…</div>`;
   return ps.map(([pid,p])=>{ const t=teamOf(p.team); const on=!H.online||!H.online.size||H.online.has(pid)||(H.me&&pid===L.pid);
-    return `<span class="pchip ${on?"":"off"}">${t?t.e+" ":""}${esc(String(p.n||"Player").slice(0,20))}</span>`; }).join("");
+    return `<span class="pchip ${on?"":"off"}">${avOf(p.av)?avOf(p.av)+" ":""}${esc(String(p.n||"Player").slice(0,20))}${t?" "+t.e:""}</span>`; }).join("");
 }
 function optTiles(r,showCounts){
   const tot=Math.max(1,(r.counts||[]).reduce((a,b)=>a+b,0));
@@ -1433,7 +1460,7 @@ function optTiles(r,showCounts){
 }
 function boardHtml(board,teamBoard,limit=5,big=false){
   const rows=board.slice(0,limit).map((r,i)=>{ const t=teamOf(r.team);
-    return `<div class="brow ${big?"big":""}"><span class="rk">${i+1}</span><span class="bn">${t?t.e+" ":""}${esc(r.n)}</span>${r.lastOk&&r.last?`<span class="gain">+${r.last}</span>`:""}<span class="bs">${r.s.toLocaleString()}</span></div>`; }).join("");
+    return `<div class="brow ${big?"big":""}"><span class="rk">${i+1}</span><span class="bn">${avOf(r.av)?avOf(r.av)+" ":""}${esc(r.n)}${t?" "+t.e:""}</span>${r.lastOk&&r.last?`<span class="gain">+${r.last}</span>`:""}<span class="bs">${r.s.toLocaleString()}</span></div>`; }).join("");
   const teams=(teamBoard||[]).length?`<div class="tboard">${teamBoard.map((t,i)=>{const T=teamOf(t.k);return `<div class="trow"><span>${i===0?"🏆 ":""}${T.e} ${T.n} <small>(${t.members})</small></span><b>${t.avg.toLocaleString()}</b></div>`}).join("")}<div class="tnote">Team score = average per member</div></div>`:"";
   return (rows||`<div class="empty">No scores yet</div>`)+teams;
 }
@@ -1441,7 +1468,7 @@ function myPickNow(){ const r=H.room; if(!r||!H.me) return null; const qi=r.qi; 
 function renderHost(){
   const r=H.room, v=$("hostView"); if(!r||!v) return;
   const head=`<div class="hhead"><div><span class="hcode">Room <b>${esc(r.code)}</b></span> <span class="net ok" id="hNet">● Live</span></div>
-    <div class="hbtns">${r.status!=="end"?`<label class="auto"><input type="checkbox" id="hAuto" ${HOSTCFG.auto?"checked":""}> Auto-advance</label><button class="iconbtn" id="hEnd">End game</button>`:""}<button class="iconbtn" id="hLeave">✕ Close</button></div></div>`;
+    <div class="hbtns">${r.status!=="end"?`<label class="auto">Auto-advance <select id="hAuto" aria-label="Auto-advance delay">${AUTO_CHOICES.map(v=>`<option value="${v}" ${(HOSTCFG.auto?HOSTCFG.autoSecs:0)===v?"selected":""}>${v?v+"s":"Off"}</option>`).join("")}</select></label><button class="iconbtn" id="hEnd">End game</button>`:""}<button class="iconbtn" id="hLeave">✕ Close</button></div></div>`;
   let body="";
   if(r.status==="lobby"){
     body=`<div class="lobby">
@@ -1452,6 +1479,7 @@ function renderHost(){
         <div class="label" style="text-align:left">Players (<span id="hCount">${Object.keys(H.players).length}</span>)</div>
         <div id="hPlayers" class="pchips">${playerChips()}</div>
         ${H.me&&r.teams?`<div class="label" style="text-align:left">Your team, ${esc(H.me)}</div><div class="topics" id="hMyTeam"></div>`:""}
+        ${!H.me?`<div class="hjoin"><div class="label" style="text-align:left">Play along on this screen too?</div><div class="hjoinrow"><button class="iconbtn avbtn" id="hJoinAv" title="Change badge" aria-label="Change badge">${MY_AV}</button><input id="hJoinName" class="search" maxlength="20" placeholder="Your name" aria-label="Your name, to play along" value="${esc(H.joinName||(H.joinName=randName()))}"><button class="iconbtn" id="hJoinRoll" title="Random name" aria-label="Random name">🎲</button><button class="iconbtn" id="hJoinBtn">Join</button></div></div>`:""}
         <button class="big" id="hStart" ${Object.keys(H.players).length?"":"disabled"}>Start the game 🍻</button></div></div>`;
   } else if(r.status==="question"){
     body=`<div class="hq"><div class="hqtop"><span class="tag">${esc(r.q.tag)}</span><span class="qn">Question ${r.qi+1} / ${r.total}</span></div>
@@ -1470,7 +1498,7 @@ function renderHost(){
     const b=r.board||[], pod=[b[1],b[0],b[2]];
     const hard=[...(r.hard||[])].sort((a,b)=>a.pct-b.pct).slice(0,6);
     body=`<div class="endh"><h2>Final results</h2>
-      <div class="podium">${pod.map((p,i)=>p?`<div class="pod p${[2,1,3][i]}" style="animation-delay:${[0.8,1.6,0][i]}s"><div class="pn">${esc(p.n)}</div><div class="ps">${p.s.toLocaleString()}</div><div class="pb">${["🥈","🥇","🥉"][i]}</div></div>`:"<div></div>").join("")}</div>
+      <div class="podium">${pod.map((p,i)=>p?`<div class="pod p${[2,1,3][i]}" style="animation-delay:${[0.8,1.6,0][i]}s"><div class="pn">${avOf(p.av)?avOf(p.av)+" ":""}${esc(p.n)}</div><div class="ps">${p.s.toLocaleString()}</div><div class="pb">${["🥈","🥇","🥉"][i]}</div></div>`:"<div></div>").join("")}</div>
       <div class="revgrid"><div class="minib"><div class="label" style="text-align:left">Full ranking</div>${boardHtml(b,r.teamBoard,100)}</div>
       <div class="minib"><div class="label" style="text-align:left">Trainer view: hardest for this group</div>${hard.length?hard.map(h=>`<div class="hrow"><span>${esc(h.short)}</span><b class="${h.pct<50?"lo":""}">${h.pct}%</b></div>`).join(""):`<div class="empty">No questions answered</div>`}</div></div>
       <div class="coverbtns"><button class="iconbtn" id="hCsv">📋 Copy results (CSV)</button><button class="iconbtn" id="hNew">↺ New game</button></div><div id="csvOut"></div></div>`;
@@ -1480,8 +1508,12 @@ function renderHost(){
   on("hLeave",hostLeave); on("hEnd",()=>{ if(confirmTap("hEnd","Tap again to end")) hostEnd(); });
   on("hStart",hostNext); on("hNext",hostNext); on("hReveal",closeQuestion); on("hNew",()=>{ lsSet("nk_host",null); hostLeave(); });
   on("hCopy",()=>copyText(joinLink(),"hCopy")); on("hCsv",()=>copyText(resultsCsv(),"hCsv"));
-  const a=$("hAuto"); if(a) a.onchange=()=>{ HOSTCFG.auto=a.checked; lsSet("nk_hostcfg",HOSTCFG); if(!a.checked){ clearAuto(); renderHost(); } else if(H.room.status==="reveal") scheduleAuto(10000); };
+  const a=$("hAuto"); if(a) a.onchange=()=>{ const v=+a.value; HOSTCFG.auto=v>0; if(v) HOSTCFG.autoSecs=v; lsSet("nk_hostcfg",HOSTCFG); if(!v){ clearAuto(); renderHost(); } else if(H.room.status==="reveal") scheduleAuto(v*1000); };
   if(r.status==="lobby"&&joinLink()) drawQR();
+  on("hJoinBtn",()=>hostJoin($("hJoinName").value));
+  on("hJoinRoll",()=>{ SFX.click(); H.joinName=randName(); const el=$("hJoinName"); if(el) el.value=H.joinName; });
+  on("hJoinAv",()=>{ SFX.click(); MY_AV=AVATARS[(AVATARS.indexOf(MY_AV)+1)%AVATARS.length]; const el=$("hJoinAv"); if(el) el.textContent=MY_AV; });
+  const jn=$("hJoinName"); if(jn){ jn.addEventListener("keydown",e=>{ if(e.key==="Enter") hostJoin(jn.value); }); jn.addEventListener("input",()=>{ H.joinName=jn.value; }); }
   if(r.status==="lobby"&&H.me&&r.teams){ const mine=H.players[L.pid]; chipRow("hMyTeam",TEAMS.map(t=>[t.k,`${t.e} ${t.n}`]),mine&&mine.team,hostSetTeam); }
   if(r.status==="question"&&H.me){ const mp=myPickNow(); document.querySelectorAll("#hostView .tile").forEach((el,i)=>{ if(mp==null){ el.classList.add("pickable"); el.onclick=()=>hostPick(i); } else if(mp===i) el.classList.add("mine"); }); }
   if(r.status==="question"){ const el=$("hAnswered"); if(el) el.textContent=`${Object.keys(H.players).filter(p=>validAns(H.players[p],r.qi)).length} / ${Object.keys(H.players).length} answered`; }
@@ -1526,13 +1558,13 @@ async function joinGame(codeIn,nameIn){
     const d=rs.exists?rs.data():null;
     if(!d||!d.status) throw {msg:"No game found with code "+code+". Check the code on the trainer's screen."};
     if(d.status==="end") throw {msg:"That game has already finished."};
-    P.code=code; P.name=name; P.ref=L.db.doc(`rooms/${code}/players/${L.pid}`);
+    P.code=code; P.name=name; P.av=MY_AV; P.ref=L.db.doc(`rooms/${code}/players/${L.pid}`);
     const mine=await retry(()=>P.ref.get());
-    if(mine.exists){ P.me=mine.data(); await retry(()=>P.ref.update({n:name,seen:Date.now()})); }
-    else { P.me={n:name,team:null,joinedAt:Date.now(),seen:Date.now(),a:{}}; await retry(()=>P.ref.set(P.me)); }
+    if(mine.exists){ P.me=mine.data(); await retry(()=>P.ref.update({n:name,av:MY_AV,seen:Date.now()})); }
+    else { P.me={n:name,av:MY_AV,team:null,joinedAt:Date.now(),seen:Date.now(),a:{}}; await retry(()=>P.ref.set(P.me)); }
     P.picks={}; Object.entries(P.me.a||{}).forEach(([k,v])=>{ P.picks[+k.slice(1)]=v.c; });
     P.lastSeq=0; P.qiShown=-1; P.room=null; P.lastStatus=null;
-    lsSet("nk_player",{code,name});
+    lsSet("nk_player",{code,name,av:MY_AV}); lsSet("nk_me",{name,av:MY_AV});
     show("player"); applyRoom(d);
     if(P.unsub) P.unsub();
     P.unsub=L.db.doc("rooms/"+code).onSnapshot(s=>{ if(s.exists) applyRoom(s.data()); },()=>{});
@@ -1590,11 +1622,11 @@ function playerLeave(){
 }
 function renderPlayer(){
   const r=P.room, v=$("playerView"); if(!r||!v) return;
-  const head=`<div class="hhead"><span class="hcode">${esc(P.name)} · Room <b>${esc(r.code)}</b></span><span class="net ok" id="pNet">● Live</span></div>`;
+  const head=`<div class="hhead"><span class="hcode">${avOf(P.av)} ${esc(P.name)} · Room <b>${esc(r.code)}</b></span><span class="net ok" id="pNet">● Live</span></div>`;
   let body="";
   const me=myRow(), rank=(r.board||[]).findIndex(x=>x.pid===L.pid);
   if(r.status==="lobby"){
-    body=`<div class="pcard center"><div class="bigemoji">🍺</div><h2>You're in!</h2><p class="sub">Waiting for the trainer to start…<br>${esc(r.topicLabel)} · ${r.total} questions · ${r.dur}s each</p>
+    body=`<div class="pcard center"><div class="bigemoji">${avOf(P.av)||"🍺"}</div><h2>You're in!</h2><p class="sub">Waiting for the trainer to start…<br>${esc(r.topicLabel)} · ${r.total} questions · ${r.dur}s each</p>
       ${r.teams?`<div class="label">Pick your team</div><div class="teams">${TEAMS.map(t=>`<button class="team ${P.me.team===t.k?"sel":""}" data-k="${t.k}">${t.e}<br>${t.n}</button>`).join("")}</div>`:""}</div>`;
   } else if(r.status==="question"){
     const mine=P.picks[r.qi], dur=r.dur*1000, over=performance.now()-P.qStart>dur;
@@ -1635,6 +1667,7 @@ $("liveBack").onclick=()=>{ SFX.click(); show("start"); };
 $("hostBtn").onclick=()=>{ if(!$("hostName").value.trim()&&!confirmTap("hostBtn","Add your name to play too, or tap again")){ $("hostName").focus(); return; } hostCreate(); };
 $("hostName").addEventListener("keydown",e=>{ if(e.key==="Enter") $("hostBtn").click(); });
 $("joinBtn").onclick=()=>joinGame($("joinCode").value,$("joinName").value);
+$("rollName").onclick=()=>{ SFX.click(); $("joinName").value=randName(); };
 $("joinCode").addEventListener("input",e=>{ e.target.value=e.target.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,4); });
 ["joinCode","joinName"].forEach(id=>$(id).addEventListener("keydown",e=>{ if(e.key==="Enter") $("joinBtn").click(); }));
 
